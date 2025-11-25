@@ -44,7 +44,7 @@ func IsNumber(code int) bool {
 }
 
 func IsOperator(char string) bool {
-	operators := []string{">", "<", ">=", "<=", "="}
+	operators := []string{">", "<", ">=", "<=", "=", "!=", "!"}
 	return slices.Contains(operators, char)
 }
 
@@ -57,9 +57,13 @@ func IsWhiteSpace(char string) bool {
 }
 
 func IsIdentifier(code int) bool {
-	isUpercase := code >= 65 && code <= 90
+	isUppercase := code >= 65 && code <= 90
 	isLowercase := code >= 97 && code <= 122
-	return isUpercase || isLowercase
+	return isUppercase || isLowercase
+}
+
+func IsStar(char string) bool {
+	return char == "*"
 }
 
 func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
@@ -71,13 +75,14 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 			fmt.Sprintf("%d", char),
 		)
 		if !IsIdentifier(code) || IsWhiteSpace(string(char)) {
-			endIdx = i - 1
 			break
 		}
 		byteArr = append(byteArr, char)
+		endIdx++
 
 	}
 	identifier := string(byteArr)
+	endIdx--
 
 	switch identifier {
 	case "SELECT":
@@ -91,6 +96,14 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 	case "WHERE":
 		{
 			return TokenWhere, string(byteArr), endIdx
+		}
+	case "AND":
+		{
+			return TokenAnd, string(byteArr), endIdx
+		}
+	case "OR":
+		{
+			return TokenOr, string(byteArr), endIdx
 		}
 	default:
 		{
@@ -111,10 +124,11 @@ func ParseNumber(startIdx int, sql string) (int, int) {
 		if !IsNumber(code) || IsWhiteSpace(string(char)) {
 			break
 		}
-		endIdx += 1
 		numberArr = append(numberArr, char)
+		endIdx += 1
 
 	}
+	endIdx--
 	number, _ := strconv.Atoi(
 		string(numberArr),
 	)
@@ -127,13 +141,15 @@ func ParseOperator(startIdx int, sql string) (TokenType, string, int) {
 	for i := startIdx; i < len(sql); i++ {
 		char := sql[i]
 		if !IsOperator(string(char)) || IsWhiteSpace(string(char)) {
-			endIdx = i - 1
 			break
 		}
 		byteArr = append(byteArr, char)
+		endIdx++
 
 	}
 	identifier := string(byteArr)
+	fmt.Println("identifier", identifier)
+	endIdx--
 
 	switch identifier {
 	case ">":
@@ -208,6 +224,12 @@ func Tokenizer(sql string) []Token {
 			})
 			pointer = endIdx
 
+		} else if IsStar(string(char)) {
+			tokens = append(tokens, Token{
+				Type:  TokenStar,
+				Value: string(char),
+				Pos:   pointer,
+			})
 		}
 		pointer++
 	}
