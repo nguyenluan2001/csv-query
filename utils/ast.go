@@ -7,30 +7,33 @@ import (
 	"github.com/kr/pretty"
 )
 
+// Struct of common expression
 type BinaryExpr struct {
 	Left  interface{}
 	Op    Token
 	Right interface{}
 }
 
+// Struct of BETWEEN expression
 type BetweenExpr struct {
 	Expr  interface{}
 	Lower interface{}
 	Upper interface{}
 }
 
-type BinaryExprCombine struct {
-	Left  interface{}
-	Op    Token
-	Right interface{}
-}
-type AST struct {
-	Columns      []Token
-	From         Token
-	Where        Expr
-	WhereCombine BinaryExprCombine
+// Struct of IN expression
+type InExpr struct {
+	Expr      interface{}
+	Collector interface{}
 }
 
+type AST struct {
+	Columns []Token
+	From    Token
+	Where   Expr
+}
+
+// Check whether token existed
 func Expect(token Token, expectedType TokenType) (bool, error) {
 	if token.Type != expectedType {
 		return false, errors.New(fmt.Sprintf("Syntax error: No SELECT statement found"))
@@ -38,6 +41,7 @@ func Expect(token Token, expectedType TokenType) (bool, error) {
 	return true, nil
 }
 
+// Get columns of SELECT statement
 func ParseColumns(tokens []Token, pointer int) ([]Token, int) {
 	columns := []Token{}
 
@@ -68,10 +72,12 @@ func ParseColumns(tokens []Token, pointer int) ([]Token, int) {
 	return columns, pointer
 }
 
+// Get table of FROM statement
 func ParseFrom(tokens []Token, pointer int) (Token, int) {
 	return tokens[pointer], pointer
 }
 
+// Get AST expression of WHERE statement
 func ParseWhere(tokens []Token, pointer int) (Expr, int) {
 	whereTokens := []Token{}
 	for pointer < len(tokens) {
@@ -86,65 +92,31 @@ func ParseWhere(tokens []Token, pointer int) (Expr, int) {
 
 	p := NewParser(whereTokens)
 
+	//Register operator precedence
 	(*p).RegisterPrefix(TokenNumber, 0)
+	(*p).RegisterPrefix(TokenString, 0)
 	(*p).RegisterPrefix(TokenIdent, 0)
 	(*p).RegisterInfix(TokenOr, 100)
-	(*p).RegisterBetweenInfix(TokenBetween, 400)
 	(*p).RegisterInfix(TokenAnd, 200)
+	(*p).RegisterBetweenInfix(TokenBetween, 400)
+	(*p).RegisterInInfix(TokenIn, 400)
 	(*p).RegisterInfix(TokenGreater, 500)
 	(*p).RegisterInfix(TokenGreaterEqual, 500)
 	(*p).RegisterInfix(TokenLess, 500)
 	(*p).RegisterInfix(TokenLessEqual, 500)
 	(*p).RegisterInfix(TokenEqual, 500)
 	(*p).RegisterInfix(TokenNotEqual, 500)
-	fmt.Println("whereTokens", whereTokens)
+
+	// Start parse expression from min_bp=0
 	ast := p.ParseExpression(0)
-	// fmt.Printf("ast: %#v", pretty(ast))
+
+	fmt.Println("whereTokens", whereTokens)
 	fmt.Printf("ast:%# v", pretty.Formatter(ast))
 
 	return ast, pointer
-	// binaryExpr := BinaryExpr{}
-	// fmt.Println("binaryExpr", binaryExpr.Left)
-	// // binaryExprCombine := BinaryExprCombine{}
-	// isCombineExpr := false
-	// for pointer < len(tokens) {
-	// 	token := tokens[pointer]
-	// 	if IsOperator(fmt.Sprintf("%v", token.Value)) {
-	// 		binaryExpr.Op = token
-	// 	} else {
-	// 		if binaryExpr.Left == nil {
-	// 			binaryExpr.Left = token
-	// 		} else if binaryExpr.Right == nil {
-	// 			binaryExpr.Right = token
-	// 		}
-	// 	}
-
-	// 	if token.Type == TokenAnd {
-	// 		if _, ok := binaryExpr.Left.(BinaryExpr); !ok {
-	// 			binaryExpr.Left = binaryExpr
-	// 		}
-	// 		isCombineExpr = true
-	// 	}
-
-	// 	// _, ok := binaryExprCombine.Right.(BinaryExpr)
-	// 	// if isCombineExpr && binaryExpr.Right == nil {
-	// 	// 	binaryExpr.Right = binaryExpr
-	// 	// }
-
-	// 	pointer++
-	// }
-	// if isCombineExpr {
-	// 	// _, ok := binaryExprCombine.Right.(BinaryExpr)
-	// 	// if ok {
-	// 	// 	binaryExprCombine.Right = binaryExpr
-	// 	// }
-	// 	if binaryExpr.Right == nil {
-	// 		binaryExpr.Right = binaryExpr
-	// 	}
-	// }
-	// return binaryExpr, pointer
 }
 
+// Build AST of whole query
 func BuildAST(tokens []Token) (AST, error) {
 	ast := AST{}
 	pointer := 0
@@ -180,11 +152,9 @@ func BuildAST(tokens []Token) (AST, error) {
 	pointer++
 
 	// === Parse where ===
-
 	where, endIdx := ParseWhere(tokens, pointer)
-	pointer = endIdx + 1
 	ast.Where = where
-	// ast.WhereCombine = whereCombine
+	pointer = endIdx + 1
 
 	return ast, nil
 

@@ -35,6 +35,7 @@ const (
 	TokenWhere
 	TokenLimit
 	TokenBetween
+	TokenIn
 	// parentheses
 	TokenLParen
 	TokenRParen
@@ -42,6 +43,10 @@ const (
 
 func IsNumber(code int) bool {
 	return code >= 48 && code <= 57
+}
+
+func IsSingleQuote(char string) bool {
+	return char == `'`
 }
 
 func IsOperator(char string) bool {
@@ -65,6 +70,14 @@ func IsIdentifier(code int) bool {
 
 func IsStar(char string) bool {
 	return char == "*"
+}
+
+func IsLeftParen(char string) bool {
+	return char == "("
+}
+
+func IsRightParen(char string) bool {
+	return char == ")"
 }
 
 func IsEOF(token Token) bool {
@@ -114,6 +127,10 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 		{
 			return TokenBetween, string(byteArr), endIdx
 		}
+	case "IN":
+		{
+			return TokenIn, string(byteArr), endIdx
+		}
 	default:
 		{
 
@@ -142,6 +159,22 @@ func ParseNumber(startIdx int, sql string) (int, int) {
 		string(numberArr),
 	)
 	return number, endIdx
+}
+
+func ParseString(startIdx int, sql string) (string, int) {
+	strBytes := []byte{}
+	endIdx := startIdx
+	for i := startIdx + 1; i < len(sql); i++ {
+		char := sql[i]
+		if IsSingleQuote(string(char)) {
+			endIdx += 1
+			break
+		}
+		strBytes = append(strBytes, char)
+		endIdx += 1
+
+	}
+	return string(strBytes), endIdx
 }
 
 func ParseOperator(startIdx int, sql string) (TokenType, string, int) {
@@ -208,6 +241,15 @@ func Tokenizer(sql string) []Token {
 				EndPos: endIdx,
 			})
 			pointer = endIdx
+		} else if IsSingleQuote(string(char)) {
+			value, endIdx := ParseString(pointer, sql)
+			tokens = append(tokens, Token{
+				Type:   TokenString,
+				Value:  value,
+				Pos:    pointer,
+				EndPos: endIdx,
+			})
+			pointer = endIdx
 		} else if IsIdentifier(code) {
 			tokenType, value, endIdx := ParseIdentifier(pointer, sql)
 			tokens = append(tokens, Token{
@@ -236,6 +278,18 @@ func Tokenizer(sql string) []Token {
 		} else if IsStar(string(char)) {
 			tokens = append(tokens, Token{
 				Type:  TokenStar,
+				Value: string(char),
+				Pos:   pointer,
+			})
+		} else if IsLeftParen(string(char)) {
+			tokens = append(tokens, Token{
+				Type:  TokenLParen,
+				Value: string(char),
+				Pos:   pointer,
+			})
+		} else if IsRightParen(string(char)) {
+			tokens = append(tokens, Token{
+				Type:  TokenRParen,
 				Value: string(char),
 				Pos:   pointer,
 			})

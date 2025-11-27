@@ -4,43 +4,6 @@ import (
 	"fmt"
 )
 
-// func ParseOperator(char string) Token {
-// 	switch char {
-// 	case "+":
-// 		{
-// 			return Token{
-// 				Type:  TokenPlus,
-// 				Value: char,
-// 			}
-// 		}
-// 	case "-":
-// 		{
-// 			return Token{
-// 				Type:  TokenMinus,
-// 				Value: char,
-// 			}
-// 		}
-// 	case "*":
-// 		{
-// 			return Token{
-// 				Type:  TokenMultiply,
-// 				Value: char,
-// 			}
-// 		}
-// 	case "/":
-// 		{
-// 			return Token{
-// 				Type:  TokenDivide,
-// 				Value: char,
-// 			}
-// 		}
-// 	default:
-// 		{
-// 			return Token{}
-// 		}
-// 	}
-// }
-
 type Parser struct {
 	tokens  []Token
 	current Token
@@ -58,14 +21,7 @@ type OpInfo struct {
 }
 
 type Expr interface {
-	// Eval() int
 }
-
-// type BinaryExpr struct {
-// 	Left  interface{}
-// 	Op    Token
-// 	Right interface{}
-// }
 
 func NewParser(tokens []Token) *Parser {
 	p := &Parser{
@@ -77,6 +33,36 @@ func NewParser(tokens []Token) *Parser {
 	return p
 }
 
+// Register binding power for BETWEEN operator
+func (p *Parser) RegisterBetweenInfix(tokenType TokenType, lbp int) {
+	(*p).opTable[tokenType] = OpInfo{
+		lbp: lbp,
+		led: func(left interface{}) interface{} {
+			ranges := p.ParseBetweenExpression()
+			return BetweenExpr{
+				Expr:  left,
+				Lower: ranges[0],
+				Upper: ranges[1],
+			}
+		},
+	}
+}
+
+// Register binding power for IN operator
+func (p *Parser) RegisterInInfix(tokenType TokenType, lbp int) {
+	(*p).opTable[tokenType] = OpInfo{
+		lbp: lbp,
+		led: func(left interface{}) interface{} {
+			collector := p.ParseInExpression()
+			return InExpr{
+				Expr:      left,
+				Collector: collector,
+			}
+		},
+	}
+}
+
+// Register binding power for common operators
 func (p *Parser) RegisterInfix(tokenType TokenType, lbp int) {
 	(*p).opTable[tokenType] = OpInfo{
 		lbp: lbp,
@@ -92,22 +78,7 @@ func (p *Parser) RegisterInfix(tokenType TokenType, lbp int) {
 	}
 }
 
-func (p *Parser) RegisterBetweenInfix(tokenType TokenType, lbp int) {
-	(*p).opTable[tokenType] = OpInfo{
-		lbp: lbp,
-		led: func(left interface{}) interface{} {
-			// op := p.tokens[p.pointer-1]
-			// right := p.ParseExpression(lbp)
-			ranges := p.ParseBetweenExpression()
-			return BetweenExpr{
-				Expr:  left,
-				Lower: ranges[0],
-				Upper: ranges[1],
-			}
-		},
-	}
-}
-
+// Register precedence for prefix token
 func (p *Parser) RegisterPrefix(tokenType TokenType, lbp int) {
 	(*p).opTable[tokenType] = OpInfo{
 		lbp: lbp,
@@ -117,22 +88,25 @@ func (p *Parser) RegisterPrefix(tokenType TokenType, lbp int) {
 	}
 }
 
+// Moving to next token
 func (p *Parser) Advance() {
-	if p.pointer < len(p.tokens) {
+	if p.pointer < len(p.tokens)-1 {
 		p.pointer++
 		p.current = p.tokens[p.pointer]
 	}
 }
 
+// Get binding power of token
 func (p *Parser) GetLBP(tokenType TokenType) int {
 	return p.opTable[tokenType].lbp
 }
 
+// Pratt parser function
 func (p *Parser) ParseExpression(minBp int) Expr {
 	t := p.current
 	p.Advance()
 	var left Expr
-	if t.Type == TokenNumber || t.Type == TokenIdent {
+	if t.Type == TokenNumber || t.Type == TokenIdent || t.Type == TokenString {
 		left = p.opTable[t.Type].nud(p)
 	}
 
@@ -145,8 +119,9 @@ func (p *Parser) ParseExpression(minBp int) Expr {
 	return left
 }
 
+// Handle parse tokens into BETWEEN expression format
 func (p *Parser) ParseBetweenExpression() []interface{} {
-	ranges := []interface{}{}
+	ranges := []interface{}{} // Store lower and upper tokens
 	for len(ranges) < 2 {
 		t := p.current
 		if t.Type != TokenAnd {
@@ -157,35 +132,36 @@ func (p *Parser) ParseBetweenExpression() []interface{} {
 	return ranges
 }
 
-// func (ast *BinaryExpr) Eval() int {
-// 	var left int
-// 	left := ast.Left.Eval()
-// 	right := ast.Left.Eval()
-// 	op := ast.Op
-// 	// fmt.Printf(left)
-// 	return Compute(left, op.Type, right)
-// }
+// Handle parse tokens into IN expression format
+func (p *Parser) ParseInExpression() []interface{} {
+	if p.current.Type != TokenLParen {
+		panic("Missing '(' symbol")
+	}
+	p.Advance()
+	collector := []interface{}{} // Store tokens within "(" and ")"
+	for p.current.Type != TokenRParen {
+		if p.current.Type != TokenComma {
+			collector = append(collector, p.current)
+		}
+		p.Advance()
+	}
+	p.Advance()
+	return collector
+}
 
-// func Eval(ast interface{}) int {
-// 	token, isToken := ast.(Token)
-// 	if isToken {
-// 		number, _ := strconv.Atoi(fmt.Sprintf("%v", token.Value))
-// 		return number
-// 	}
-
-// 	binary, _ := ast.(BinaryExpr)
-// 	left := Eval(binary.Left)
-// 	right := Eval(binary.Right)
-// 	op := binary.Op.Type
-// 	return Compute(left, op, right)
-// }
-
-func Eval(ast interface{}, row []string, headerIndex map[string]int) int {
+// Handle validate input data based on AST expression
+func Eval(ast interface{}, row []string, headerIndex map[string]int) interface{} {
 
 	//If ast is instance of BetweenExpr
 	betweenExpr, isBetweenExpr := ast.(BetweenExpr)
 	if isBetweenExpr {
 		return ComputeBetween(betweenExpr, row, headerIndex)
+	}
+
+	//If ast is instance of InExpr
+	inExpr, isInExpr := ast.(InExpr)
+	if isInExpr {
+		return ComputeIn(inExpr, row, headerIndex)
 	}
 
 	token, isToken := ast.(Token)
@@ -197,12 +173,21 @@ func Eval(ast interface{}, row []string, headerIndex map[string]int) int {
 		}
 		if token.Type == TokenIdent {
 			fieldIdx := headerIndex[fmt.Sprintf("%v", token.Value)]
-			number, _ := StringToInt(row[fieldIdx])
-			return number
+			number, numberErr := StringToInt(row[fieldIdx])
+
+			//If data can perform number
+			if numberErr == nil {
+				return number
+			}
+			return Stringify(row[fieldIdx])
+		}
+		if token.Type == TokenString {
+			str := Stringify(token.Value)
+			return str
 		}
 	}
 
-	// If ast is expression
+	// If ast is expression => recurrive Eval()
 	binary, _ := ast.(BinaryExpr)
 	left := Eval(binary.Left, row, headerIndex)
 	right := Eval(binary.Right, row, headerIndex)
@@ -210,7 +195,36 @@ func Eval(ast interface{}, row []string, headerIndex map[string]int) int {
 	return Compute(left, op, right)
 }
 
-func Compute(left int, op TokenType, right int) int {
+// Compute proxy to specific data type
+func Compute(left interface{}, op TokenType, right interface{}) int {
+	leftStr, isString := left.(string)
+	rightStr, _ := right.(string)
+	if isString {
+		return ComputeString(leftStr, op, rightStr)
+	}
+
+	leftNumber, _ := left.(int)
+	rightNumber, _ := right.(int)
+	return ComputeNumber(leftNumber, op, rightNumber)
+}
+
+// Handle compute for string
+func ComputeString(left string, op TokenType, right string) int {
+	switch op {
+	case TokenEqual:
+		{
+			return BooleanToInt(left == right)
+		}
+	default:
+		{
+			return 0
+		}
+	}
+}
+
+// Handle compute for number (int or float)
+func ComputeNumber(left int, op TokenType, right int) int {
+	fmt.Println("ComputeNumber", left, right)
 	switch op {
 	case TokenGreater:
 		{
@@ -251,6 +265,7 @@ func Compute(left int, op TokenType, right int) int {
 	}
 }
 
+// Handle compute for BETWEEN expression
 func ComputeBetween(ast BetweenExpr, row []string, headerIndex map[string]int) int {
 	tokenExpr, isTokenExpr := ast.Expr.(Token)
 	tokenLower, isTokenLower := ast.Lower.(Token)
@@ -266,65 +281,23 @@ func ComputeBetween(ast BetweenExpr, row []string, headerIndex map[string]int) i
 	return BooleanToInt(number >= lowerNumber && number <= upperNumber)
 }
 
-// func Compute(left int, op TokenType, right int) int {
-// 	switch op {
-// 	case TokenPlus:
-// 		{
-// 			return left + right
-// 		}
-// 	case TokenMinus:
-// 		{
-// 			return left - right
-// 		}
-// 	case TokenMultiply:
-// 		{
-// 			return left * right
-// 		}
-// 	case TokenDivide:
-// 		{
-// 			return left / right
-// 		}
-// 	default:
-// 		{
-// 			return 0
-// 		}
-// 	}
-// }
-
-// func main() {
-// 	exp := "1+2+3*3+4/2"
-// 	tokens := []Token{}
-
-// 	for _, char := range exp {
-// 		if IsOperator(string(char)) {
-// 			tokens = append(tokens, ParseOperator(string(char)))
-// 		} else {
-// 			number, _ := strconv.Atoi(
-// 				string(char),
-// 			)
-// 			tokens = append(tokens, Token{
-// 				Type:  TokenNumber,
-// 				Value: number,
-// 			})
-// 		}
-
-// 	}
-
-// 	tokens = append(tokens, Token{
-// 		Type:  TokenEOF,
-// 		Value: nil,
-// 	})
-
-// 	p := NewParser(tokens)
-// 	(*p).RegisterPrefix(TokenNumber, 0)
-// 	(*p).RegisterInfix(TokenPlus, 1)
-// 	(*p).RegisterInfix(TokenMinus, 1)
-// 	(*p).RegisterInfix(TokenMultiply, 2)
-// 	(*p).RegisterInfix(TokenDivide, 2)
-// 	ast := p.ParseExpression(0)
-
-// 	fmt.Println(tokens)
-// 	fmt.Println(p)
-// 	fmt.Printf("ast: %+v", ast)
-// 	fmt.Println("Eval: ", Eval(ast))
-// }
+// Handle compute for IN expression
+func ComputeIn(ast InExpr, row []string, headerIndex map[string]int) int {
+	fmt.Println("ComputeIn")
+	tokenExpr, isTokenExpr := ast.Expr.(Token)
+	collector, isCollector := ast.Collector.([]interface{})
+	if !isTokenExpr || !isCollector {
+		return 0
+	}
+	fieldIdx := headerIndex[fmt.Sprintf("%v", tokenExpr.Value)]
+	exprVal := row[fieldIdx]
+	fmt.Println("exprVal", exprVal)
+	isValid := 0
+	for _, val := range collector {
+		token, _ := val.(Token)
+		if Stringify(exprVal) == Stringify(token.Value) {
+			isValid = 1
+		}
+	}
+	return isValid
+}
