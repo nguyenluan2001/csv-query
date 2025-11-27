@@ -109,16 +109,19 @@ func Execute(ast AST) error {
 		}
 		result = append(result, SelectField(row, headerIndex, ast.Columns))
 	}
-	sort.Slice(result, func(i, j int) bool {
-		// return people[i].Age < people[j].Age
-		field := ast.OrderBy[0].Field
-		direction := ast.OrderBy[0].Direction
-		fieldIdx := headerIndex[field]
-		if direction == TokenAsc {
-			return result[i][fieldIdx] < result[j][fieldIdx]
-		}
-		return result[i][fieldIdx] > result[j][fieldIdx]
-	})
+
+	if ast.OrderBy != nil {
+		sort.Slice(result, func(i, j int) bool {
+			// return people[i].Age < people[j].Age
+			field := ast.OrderBy[0].Field
+			direction := ast.OrderBy[0].Direction
+			fieldIdx := headerIndex[field]
+			if direction == TokenAsc {
+				return result[i][fieldIdx] < result[j][fieldIdx]
+			}
+			return result[i][fieldIdx] > result[j][fieldIdx]
+		})
+	}
 	fmt.Println("result:", result)
 	return nil
 

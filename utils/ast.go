@@ -180,15 +180,15 @@ func BuildAST(tokens []Token) (AST, error) {
 
 	// === Expect WHERE
 	isNext, err = Expect(tokens[pointer], TokenWhere)
+	fmt.Println("isNext", isNext, pointer, tokens[pointer])
 	if isNext {
 		// === Parse where ===
-		where, endIdx := ParseWhere(tokens, pointer)
+		where, endIdx := ParseWhere(tokens, pointer+1)
 		ast.Where = where
 		pointer = endIdx
 	}
 
 	isNext, err = Expect(tokens[pointer], TokenOrderBy)
-	fmt.Println("isNext", isNext, pointer, tokens[pointer])
 	if isNext {
 		orderBy, endIdx := ParseOrderBy(tokens, pointer)
 		ast.OrderBy = orderBy

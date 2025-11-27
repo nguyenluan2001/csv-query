@@ -297,6 +297,7 @@ func ComputeIn(ast InExpr, row []string, headerIndex map[string]int) int {
 		token, _ := val.(Token)
 		if Stringify(exprVal) == Stringify(token.Value) {
 			isValid = 1
+			break
 		}
 	}
 	return isValid
