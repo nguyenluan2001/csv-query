@@ -98,13 +98,14 @@ func Execute(ast AST) error {
 			headerIndex = ParseHeaderIndex(header)
 		}
 
-		isValid := FilterRow(row, headerIndex, ast.Where)
-		if !isValid {
+		// isValid := FilterRow(row, headerIndex, ast.Where)
+		isValid := Eval(ast.Where, row, headerIndex)
+		if isValid == 0 {
 			continue
 		}
 		result = append(result, SelectField(row, headerIndex, ast.Columns))
 	}
-	fmt.Println(result)
+	fmt.Println("result:", result)
 	return nil
 
 }

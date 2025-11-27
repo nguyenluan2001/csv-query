@@ -8,13 +8,19 @@ import (
 
 func main() {
 	// sql := "SELECT name,salary, age FROM employees WHERE salary > 50000 AND age >=30"
-	sql := "SELECT name,salary, age FROM employees WHERE salary > 50000"
+	// sql := "SELECT * FROM employees WHERE salary >= 50000 AND age >= 30 AND id >= 2"
+	// sql := "SELECT * FROM employees WHERE age <> 40"
+	// sql := "SELECT * FROM employees WHERE age BETWEEN 30 AND 40 AND salary > 50000"
+	// sql := "SELECT * FROM employees WHERE age BETWEEN 30 AND 40"
+	// sql := "SELECT * FROM employees WHERE salary BETWEEN 50000 AND 80000"
+	// sql := "SELECT * FROM employees WHERE salary BETWEEN 50000 AND 80000 AND age BETWEEN 35 AND 40"
+	sql := "SELECT * FROM employees WHERE salary BETWEEN 50000 AND 80000 AND age < 30"
 	tokens := utils.Tokenizer(sql)
 	fmt.Println("tokens", tokens)
 
 	ast, err := utils.BuildAST(tokens)
-	fmt.Println("ast", ast.WhereCombine.Left)
-	fmt.Println("ast", ast.WhereCombine.Right)
+	// fmt.Println("ast", ast.WhereCombine.Left)
+	// fmt.Println("ast", ast.WhereCombine.Right)
 	fmt.Println("err", err)
 
 	utils.Execute(ast)

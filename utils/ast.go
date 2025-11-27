@@ -3,12 +3,20 @@ package utils
 import (
 	"errors"
 	"fmt"
+
+	"github.com/kr/pretty"
 )
 
 type BinaryExpr struct {
 	Left  interface{}
 	Op    Token
 	Right interface{}
+}
+
+type BetweenExpr struct {
+	Expr  interface{}
+	Lower interface{}
+	Upper interface{}
 }
 
 type BinaryExprCombine struct {
@@ -19,7 +27,7 @@ type BinaryExprCombine struct {
 type AST struct {
 	Columns      []Token
 	From         Token
-	Where        BinaryExpr
+	Where        Expr
 	WhereCombine BinaryExprCombine
 }
 
@@ -64,47 +72,77 @@ func ParseFrom(tokens []Token, pointer int) (Token, int) {
 	return tokens[pointer], pointer
 }
 
-func ParseWhere(tokens []Token, pointer int) (BinaryExpr, int) {
-	binaryExpr := BinaryExpr{}
-	fmt.Println("binaryExpr", binaryExpr.Left)
-	// binaryExprCombine := BinaryExprCombine{}
-	isCombineExpr := false
+func ParseWhere(tokens []Token, pointer int) (Expr, int) {
+	whereTokens := []Token{}
 	for pointer < len(tokens) {
 		token := tokens[pointer]
-		if IsOperator(fmt.Sprintf("%v", token.Value)) {
-			binaryExpr.Op = token
-		} else {
-			if binaryExpr.Left == nil {
-				binaryExpr.Left = token
-			} else if binaryExpr.Right == nil {
-				binaryExpr.Right = token
-			}
+		if IsEOF(token) {
+			whereTokens = append(whereTokens, token)
+			break
 		}
-
-		if token.Type == TokenAnd {
-			if _, ok := binaryExpr.Left.(BinaryExpr); !ok {
-				binaryExpr.Left = binaryExpr
-			}
-			isCombineExpr = true
-		}
-
-		// _, ok := binaryExprCombine.Right.(BinaryExpr)
-		// if isCombineExpr && binaryExpr.Right == nil {
-		// 	binaryExpr.Right = binaryExpr
-		// }
-
+		whereTokens = append(whereTokens, token)
 		pointer++
 	}
-	if isCombineExpr {
-		// _, ok := binaryExprCombine.Right.(BinaryExpr)
-		// if ok {
-		// 	binaryExprCombine.Right = binaryExpr
-		// }
-		if binaryExpr.Right == nil {
-			binaryExpr.Right = binaryExpr
-		}
-	}
-	return binaryExpr, pointer
+
+	p := NewParser(whereTokens)
+
+	(*p).RegisterPrefix(TokenNumber, 0)
+	(*p).RegisterPrefix(TokenIdent, 0)
+	(*p).RegisterInfix(TokenOr, 100)
+	(*p).RegisterBetweenInfix(TokenBetween, 400)
+	(*p).RegisterInfix(TokenAnd, 200)
+	(*p).RegisterInfix(TokenGreater, 500)
+	(*p).RegisterInfix(TokenGreaterEqual, 500)
+	(*p).RegisterInfix(TokenLess, 500)
+	(*p).RegisterInfix(TokenLessEqual, 500)
+	(*p).RegisterInfix(TokenEqual, 500)
+	(*p).RegisterInfix(TokenNotEqual, 500)
+	fmt.Println("whereTokens", whereTokens)
+	ast := p.ParseExpression(0)
+	// fmt.Printf("ast: %#v", pretty(ast))
+	fmt.Printf("ast:%# v", pretty.Formatter(ast))
+
+	return ast, pointer
+	// binaryExpr := BinaryExpr{}
+	// fmt.Println("binaryExpr", binaryExpr.Left)
+	// // binaryExprCombine := BinaryExprCombine{}
+	// isCombineExpr := false
+	// for pointer < len(tokens) {
+	// 	token := tokens[pointer]
+	// 	if IsOperator(fmt.Sprintf("%v", token.Value)) {
+	// 		binaryExpr.Op = token
+	// 	} else {
+	// 		if binaryExpr.Left == nil {
+	// 			binaryExpr.Left = token
+	// 		} else if binaryExpr.Right == nil {
+	// 			binaryExpr.Right = token
+	// 		}
+	// 	}
+
+	// 	if token.Type == TokenAnd {
+	// 		if _, ok := binaryExpr.Left.(BinaryExpr); !ok {
+	// 			binaryExpr.Left = binaryExpr
+	// 		}
+	// 		isCombineExpr = true
+	// 	}
+
+	// 	// _, ok := binaryExprCombine.Right.(BinaryExpr)
+	// 	// if isCombineExpr && binaryExpr.Right == nil {
+	// 	// 	binaryExpr.Right = binaryExpr
+	// 	// }
+
+	// 	pointer++
+	// }
+	// if isCombineExpr {
+	// 	// _, ok := binaryExprCombine.Right.(BinaryExpr)
+	// 	// if ok {
+	// 	// 	binaryExprCombine.Right = binaryExpr
+	// 	// }
+	// 	if binaryExpr.Right == nil {
+	// 		binaryExpr.Right = binaryExpr
+	// 	}
+	// }
+	// return binaryExpr, pointer
 }
 
 func BuildAST(tokens []Token) (AST, error) {

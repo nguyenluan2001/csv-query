@@ -34,6 +34,7 @@ const (
 	TokenFrom
 	TokenWhere
 	TokenLimit
+	TokenBetween
 	// parentheses
 	TokenLParen
 	TokenRParen
@@ -44,7 +45,7 @@ func IsNumber(code int) bool {
 }
 
 func IsOperator(char string) bool {
-	operators := []string{">", "<", ">=", "<=", "=", "!=", "!"}
+	operators := []string{">", "<", ">=", "<=", "=", "<>", "!"}
 	return slices.Contains(operators, char)
 }
 
@@ -64,6 +65,10 @@ func IsIdentifier(code int) bool {
 
 func IsStar(char string) bool {
 	return char == "*"
+}
+
+func IsEOF(token Token) bool {
+	return token.Type == TokenEOF
 }
 
 func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
@@ -104,6 +109,10 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 	case "OR":
 		{
 			return TokenOr, string(byteArr), endIdx
+		}
+	case "BETWEEN":
+		{
+			return TokenBetween, string(byteArr), endIdx
 		}
 	default:
 		{
@@ -168,7 +177,7 @@ func ParseOperator(startIdx int, sql string) (TokenType, string, int) {
 		{
 			return TokenLessEqual, string(byteArr), endIdx
 		}
-	case "!=":
+	case "<>":
 		{
 			return TokenNotEqual, string(byteArr), endIdx
 		}
@@ -233,5 +242,9 @@ func Tokenizer(sql string) []Token {
 		}
 		pointer++
 	}
+	tokens = append(tokens, Token{
+		Type:  TokenEOF,
+		Value: nil,
+	})
 	return tokens
 }
