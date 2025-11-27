@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"sort"
 )
 
 func ParseHeaderIndex(header []string) map[string]int {
@@ -98,13 +99,26 @@ func Execute(ast AST) error {
 			headerIndex = ParseHeaderIndex(header)
 		}
 
-		// isValid := FilterRow(row, headerIndex, ast.Where)
-		isValid := Eval(ast.Where, row, headerIndex)
+		var isValid interface{}
+
+		if ast.Where != nil {
+			isValid = Eval(ast.Where, row, headerIndex)
+		}
 		if isValid == 0 {
 			continue
 		}
 		result = append(result, SelectField(row, headerIndex, ast.Columns))
 	}
+	sort.Slice(result, func(i, j int) bool {
+		// return people[i].Age < people[j].Age
+		field := ast.OrderBy[0].Field
+		direction := ast.OrderBy[0].Direction
+		fieldIdx := headerIndex[field]
+		if direction == TokenAsc {
+			return result[i][fieldIdx] < result[j][fieldIdx]
+		}
+		return result[i][fieldIdx] > result[j][fieldIdx]
+	})
 	fmt.Println("result:", result)
 	return nil
 

@@ -39,6 +39,10 @@ const (
 	// parentheses
 	TokenLParen
 	TokenRParen
+
+	TokenOrderBy
+	TokenAsc
+	TokenDesc
 )
 
 func IsNumber(code int) bool {
@@ -80,6 +84,14 @@ func IsRightParen(char string) bool {
 	return char == ")"
 }
 
+func IsOrderByStart(str string) bool {
+	return str == "ORDER"
+}
+
+func IsOrderBy(str string) bool {
+	return str == "ORDER BY"
+}
+
 func IsEOF(token Token) bool {
 	return token.Type == TokenEOF
 }
@@ -92,12 +104,18 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 		code, _ := strconv.Atoi(
 			fmt.Sprintf("%d", char),
 		)
-		if !IsIdentifier(code) || IsWhiteSpace(string(char)) {
+
+		fmt.Println("IsOrderByStart", string(byteArr), string(char))
+		if IsOrderByStart(string(byteArr)) {
+			if IsOrderBy(string(byteArr)) {
+				break
+			}
+		} else if !IsIdentifier(code) || IsWhiteSpace(string(char)) {
 			break
 		}
+
 		byteArr = append(byteArr, char)
 		endIdx++
-
 	}
 	identifier := string(byteArr)
 	endIdx--
@@ -119,10 +137,6 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 		{
 			return TokenAnd, string(byteArr), endIdx
 		}
-	case "OR":
-		{
-			return TokenOr, string(byteArr), endIdx
-		}
 	case "BETWEEN":
 		{
 			return TokenBetween, string(byteArr), endIdx
@@ -130,6 +144,22 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 	case "IN":
 		{
 			return TokenIn, string(byteArr), endIdx
+		}
+	case "ORDER BY":
+		{
+			return TokenOrderBy, string(byteArr), endIdx
+		}
+	case "ASC":
+		{
+			return TokenAsc, string(byteArr), endIdx
+		}
+	case "DESC":
+		{
+			return TokenDesc, string(byteArr), endIdx
+		}
+	case "OR":
+		{
+			return TokenOr, string(byteArr), endIdx
 		}
 	default:
 		{

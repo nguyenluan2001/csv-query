@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/kr/pretty"
 )
@@ -27,10 +28,16 @@ type InExpr struct {
 	Collector interface{}
 }
 
+type OrderBySingle struct {
+	Field     string
+	Direction TokenType
+}
+
 type AST struct {
 	Columns []Token
 	From    Token
 	Where   Expr
+	OrderBy []OrderBySingle
 }
 
 // Check whether token existed
@@ -77,13 +84,18 @@ func ParseFrom(tokens []Token, pointer int) (Token, int) {
 	return tokens[pointer], pointer
 }
 
+func CheckStopParseWhere(token Token) bool {
+	stopTokens := []TokenType{TokenOrderBy, TokenEOF}
+	return slices.Contains(stopTokens, token.Type)
+}
+
 // Get AST expression of WHERE statement
 func ParseWhere(tokens []Token, pointer int) (Expr, int) {
 	whereTokens := []Token{}
 	for pointer < len(tokens) {
 		token := tokens[pointer]
-		if IsEOF(token) {
-			whereTokens = append(whereTokens, token)
+		if CheckStopParseWhere(token) {
+			whereTokens = append(whereTokens, tokens[len(tokens)-1])
 			break
 		}
 		whereTokens = append(whereTokens, token)
@@ -116,6 +128,28 @@ func ParseWhere(tokens []Token, pointer int) (Expr, int) {
 	return ast, pointer
 }
 
+func ParseOrderBy(tokens []Token, pointer int) ([]OrderBySingle, int) {
+	orderBy := []OrderBySingle{}
+	for pointer < len(tokens) {
+		token := tokens[pointer]
+		if token.Type == TokenComma {
+			pointer++
+			continue
+		}
+		if token.Type == TokenIdent {
+			orderBy = append(orderBy, OrderBySingle{
+				Field:     Stringify(token.Value),
+				Direction: TokenAsc,
+			})
+		}
+		if token.Type == TokenAsc || token.Type == TokenDesc {
+			orderBy[len(orderBy)-1].Direction = token.Type
+		}
+		pointer++
+	}
+	return orderBy, pointer
+}
+
 // Build AST of whole query
 func BuildAST(tokens []Token) (AST, error) {
 	ast := AST{}
@@ -146,15 +180,20 @@ func BuildAST(tokens []Token) (AST, error) {
 
 	// === Expect WHERE
 	isNext, err = Expect(tokens[pointer], TokenWhere)
-	if !isNext {
-		return ast, err
+	if isNext {
+		// === Parse where ===
+		where, endIdx := ParseWhere(tokens, pointer)
+		ast.Where = where
+		pointer = endIdx
 	}
-	pointer++
 
-	// === Parse where ===
-	where, endIdx := ParseWhere(tokens, pointer)
-	ast.Where = where
-	pointer = endIdx + 1
+	isNext, err = Expect(tokens[pointer], TokenOrderBy)
+	fmt.Println("isNext", isNext, pointer, tokens[pointer])
+	if isNext {
+		orderBy, endIdx := ParseOrderBy(tokens, pointer)
+		ast.OrderBy = orderBy
+		pointer = endIdx + 1
+	}
 
 	return ast, nil
 
