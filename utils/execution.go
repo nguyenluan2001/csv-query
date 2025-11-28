@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"path"
-	"sort"
+	"slices"
+	"strconv"
+	"strings"
 )
 
 func ParseHeaderIndex(header []string) map[string]int {
@@ -72,7 +75,52 @@ func SelectField(row []string, headerIndex map[string]int, columns []Token) []st
 	return newRow
 }
 
+// row1[field] - row2[field] < 0: asc
+// row2[field] - row1[field] > 0: desc
+// row1[field] - row2[field] == 0: remain
+// Process condition one by one. If row1[field]==row2[field] => process next condition
+func CompareNumber(a, b int) int {
+	return a - b
+}
+
+func CompareString(a, b string) int {
+	return strings.Compare(a, b)
+}
+
+func CompareProxy(a, b interface{}) int {
+	aNumber, aErr := strconv.Atoi(Stringify(a))
+	bNumber, bErr := strconv.Atoi(Stringify(b))
+
+	if aErr != nil || bErr != nil {
+		return CompareString(Stringify(a), Stringify(b))
+	}
+	return CompareNumber(aNumber, bNumber)
+}
+
+func OrderByComparator(conditions []OrderBySingle, headerIndex map[string]int, row1, row2 []string) int {
+	for _, condition := range conditions {
+		field := condition.Field
+		direction := condition.Direction
+		fieldIdx := headerIndex[field]
+		row1Val := Stringify(row1[fieldIdx])
+		row2Val := Stringify(row2[fieldIdx])
+
+		if row1Val == row2Val {
+			continue
+		}
+
+		if direction == TokenAsc {
+			return CompareProxy(row1Val, row2Val)
+		}
+
+		return CompareProxy(row2Val, row1Val)
+	}
+	return 0
+}
+
 func Execute(ast AST) error {
+
+	// Handle FROM statement
 	cwd, _ := os.Getwd()
 	filepath := path.Join(cwd, "..", fmt.Sprintf("%v.csv", ast.From.Value))
 	fmt.Println(filepath)
@@ -97,30 +145,32 @@ func Execute(ast AST) error {
 		if len(header) == 0 {
 			header = row
 			headerIndex = ParseHeaderIndex(header)
+			continue
 		}
 
 		var isValid interface{}
 
+		//Handle WHERE statement
 		if ast.Where != nil {
 			isValid = Eval(ast.Where, row, headerIndex)
 		}
 		if isValid == 0 {
 			continue
 		}
+
+		//Handle SELECT statement
 		result = append(result, SelectField(row, headerIndex, ast.Columns))
 	}
 
 	if ast.OrderBy != nil {
-		sort.Slice(result, func(i, j int) bool {
-			// return people[i].Age < people[j].Age
-			field := ast.OrderBy[0].Field
-			direction := ast.OrderBy[0].Direction
-			fieldIdx := headerIndex[field]
-			if direction == TokenAsc {
-				return result[i][fieldIdx] < result[j][fieldIdx]
-			}
-			return result[i][fieldIdx] > result[j][fieldIdx]
+		slices.SortFunc(result, func(row1, row2 []string) int {
+			return OrderByComparator(ast.OrderBy, headerIndex, row1, row2)
 		})
+	}
+
+	if ast.Limit > 0 {
+		maxLimit := int(math.Min(float64(ast.Limit), float64(len(result))))
+		result = result[0:maxLimit]
 	}
 	fmt.Println("result:", result)
 	return nil

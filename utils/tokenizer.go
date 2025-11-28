@@ -43,6 +43,8 @@ const (
 	TokenOrderBy
 	TokenAsc
 	TokenDesc
+
+	TokenGroupBy
 )
 
 func IsNumber(code int) bool {
@@ -92,6 +94,14 @@ func IsOrderBy(str string) bool {
 	return str == "ORDER BY"
 }
 
+func IsGroupByStart(str string) bool {
+	return str == "GROUP"
+}
+
+func IsGroupBy(str string) bool {
+	return str == "GROUP BY"
+}
+
 func IsEOF(token Token) bool {
 	return token.Type == TokenEOF
 }
@@ -108,6 +118,10 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 		fmt.Println("IsOrderByStart", string(byteArr), string(char))
 		if IsOrderByStart(string(byteArr)) {
 			if IsOrderBy(string(byteArr)) {
+				break
+			}
+		} else if IsGroupByStart(string(byteArr)) {
+			if IsGroupBy(string(byteArr)) {
 				break
 			}
 		} else if !IsIdentifier(code) || IsWhiteSpace(string(char)) {
@@ -149,6 +163,10 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 		{
 			return TokenOrderBy, string(byteArr), endIdx
 		}
+	case "GROUP BY":
+		{
+			return TokenGroupBy, string(byteArr), endIdx
+		}
 	case "ASC":
 		{
 			return TokenAsc, string(byteArr), endIdx
@@ -160,6 +178,10 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 	case "OR":
 		{
 			return TokenOr, string(byteArr), endIdx
+		}
+	case "LIMIT":
+		{
+			return TokenLimit, string(byteArr), endIdx
 		}
 	default:
 		{

@@ -21,8 +21,11 @@ func main() {
 	// sql := "SELECT * FROM employees WHERE name IN ('Alice', 'Dan', 'Eve') OR name='Frank' ORDER BY salary DESC"
 	// sql := "SELECT * FROM employees WHERE dept IN ('eng', 'ops') AND age BETWEEN 30 AND 40"
 	// sql := "SELECT * FROM employees WHERE age > 30 ORDER BY salary"
-	sql := "SELECT * FROM employees ORDER BY id DESC"
-	// sql := "SELECT * FROM employees ORDER BY salary DESC"
+	// sql := "SELECT * FROM employees ORDER BY id DESC"
+	// sql := "SELECT * FROM employees ORDER BY salary DESC, age"
+	// sql := "SELECT * FROM employees ORDER BY name DESC, age ASC"
+	// sql := "SELECT * FROM employees LIMIT 1"
+	sql := "SELECT dept FROM employees GROUP BY dept, age"
 	tokens := utils.Tokenizer(sql)
 
 	ast, err := utils.BuildAST(tokens)

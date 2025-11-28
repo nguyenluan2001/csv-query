@@ -38,6 +38,7 @@ type AST struct {
 	From    Token
 	Where   Expr
 	OrderBy []OrderBySingle
+	Limit   int
 }
 
 // Check whether token existed
@@ -150,6 +151,21 @@ func ParseOrderBy(tokens []Token, pointer int) ([]OrderBySingle, int) {
 	return orderBy, pointer
 }
 
+func ParseLimit(tokens []Token, pointer int) (int, int) {
+	limit := -1
+	for pointer < len(tokens) {
+		token := tokens[pointer]
+
+		if token.Type == TokenNumber {
+			limit, _ = StringToInt(Stringify(token.Value))
+			break
+		}
+
+		pointer++
+	}
+	return limit, pointer
+}
+
 // Build AST of whole query
 func BuildAST(tokens []Token) (AST, error) {
 	ast := AST{}
@@ -180,7 +196,7 @@ func BuildAST(tokens []Token) (AST, error) {
 
 	// === Expect WHERE
 	isNext, err = Expect(tokens[pointer], TokenWhere)
-	fmt.Println("isNext", isNext, pointer, tokens[pointer])
+
 	if isNext {
 		// === Parse where ===
 		where, endIdx := ParseWhere(tokens, pointer+1)
@@ -188,10 +204,19 @@ func BuildAST(tokens []Token) (AST, error) {
 		pointer = endIdx
 	}
 
+	// === Expect ORDER BY ===
 	isNext, err = Expect(tokens[pointer], TokenOrderBy)
 	if isNext {
 		orderBy, endIdx := ParseOrderBy(tokens, pointer)
 		ast.OrderBy = orderBy
+		pointer = endIdx + 1
+	}
+
+	// === Expect LIMIT ===
+	isNext, err = Expect(tokens[pointer], TokenLimit)
+	if isNext {
+		limit, endIdx := ParseLimit(tokens, pointer)
+		ast.Limit = limit
 		pointer = endIdx + 1
 	}
 
