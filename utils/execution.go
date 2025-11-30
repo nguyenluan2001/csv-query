@@ -13,6 +13,9 @@ import (
 	"strings"
 )
 
+type Collector []string
+type GroupByData map[string]Collector
+
 func ParseHeaderIndex(header []string) map[string]int {
 	headerIndex := map[string]int{}
 	for i, val := range header {
@@ -75,6 +78,26 @@ func SelectField(row []string, headerIndex map[string]int, columns []Token) []st
 	return newRow
 }
 
+func SelectGroupByField(row []string, headerIndex map[string]int, columns []Token, groupByMap map[string]GroupByData) ([]string, []string) {
+	newRow := []string{}
+	newHeader := []string{}
+	for _, col := range columns {
+		headerIdx := headerIndex[fmt.Sprintf("%v", col.Value)]
+		if !IsAggregateFn(col) {
+			newHeader = append(newHeader, Stringify(col.Value))
+			newRow = append(newRow, row[headerIdx])
+		} else {
+			// aggregateFn := GetAggregateFn(col)
+			collector := GetAggregateCollector(groupByMap, row[headerIdx], Stringify(col.Value))
+			PrintPretty("collector", collector)
+			aggregateVal := GetAggregateValue(col, collector)
+			newRow = append(newRow, aggregateVal)
+			newHeader = append(newHeader, GenerateAggregateColumnName(col))
+		}
+	}
+	return newRow, newHeader
+}
+
 // row1[field] - row2[field] < 0: asc
 // row2[field] - row1[field] > 0: desc
 // row1[field] - row2[field] == 0: remain
@@ -130,9 +153,12 @@ func Execute(ast AST) error {
 	}
 
 	csvReader := csv.NewReader(file)
-	header := []string{}
+	headerRow := []string{}
 	headerIndex := map[string]int{}
 	result := [][]string{}
+	groupByMap := map[string]GroupByData{}
+	groupByTable := [][]string{}
+	groupByHeader := []string{}
 	for {
 		row, err := csvReader.Read()
 		if err == io.EOF {
@@ -142,9 +168,9 @@ func Execute(ast AST) error {
 			// Handle error during reading
 		}
 
-		if len(header) == 0 {
-			header = row
-			headerIndex = ParseHeaderIndex(header)
+		if len(headerRow) == 0 {
+			headerRow = row
+			headerIndex = ParseHeaderIndex(headerRow)
 			continue
 		}
 
@@ -158,8 +184,29 @@ func Execute(ast AST) error {
 			continue
 		}
 
-		//Handle SELECT statement
-		result = append(result, SelectField(row, headerIndex, ast.Columns))
+		if ast.GroupBy == nil { // In case no GROUP BY => Process SELECT columns
+			//Handle SELECT statement
+			result = append(result, SelectField(row, headerIndex, ast.Columns))
+		} else { // In case GROUP BY => Process groupByMap and groupByTable
+			groupByFields, groupByData, otherFields, otherData, key := ProcessGroupByPerRow(row, headerRow, headerIndex, ast.GroupBy)
+			isGrouped := AppendGroupByData(groupByMap, key, otherFields, otherData)
+			if !isGrouped {
+				groupByTable = append(groupByTable, BuildGroupByRow(groupByFields, groupByData, headerRow, key))
+			}
+			fmt.Println("key", groupByFields, groupByData, otherFields, otherData, key)
+		}
+	}
+
+	if ast.GroupBy != nil {
+		for _, row := range groupByTable {
+			newRow, newHeader := SelectGroupByField(row, headerIndex, ast.Columns, groupByMap)
+			result = append(result, newRow)
+
+			if len(groupByHeader) == 0 {
+				groupByHeader = newHeader
+			}
+		}
+		result = append([][]string{groupByHeader}, result...)
 	}
 
 	if ast.OrderBy != nil {
@@ -172,7 +219,10 @@ func Execute(ast AST) error {
 		maxLimit := int(math.Min(float64(ast.Limit), float64(len(result))))
 		result = result[0:maxLimit]
 	}
-	fmt.Println("result:", result)
+	PrintPretty("GroupByMap", groupByMap)
+	PrintPretty("GroupByTable", groupByTable)
+	PrintPretty("result: ", result)
+	// fmt.Println("result:", result)
 	return nil
 
 }

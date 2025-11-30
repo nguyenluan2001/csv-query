@@ -39,6 +39,7 @@ type AST struct {
 	Where   Expr
 	OrderBy []OrderBySingle
 	Limit   int
+	GroupBy []Token
 }
 
 // Check whether token existed
@@ -47,6 +48,14 @@ func Expect(token Token, expectedType TokenType) (bool, error) {
 		return false, errors.New(fmt.Sprintf("Syntax error: No SELECT statement found"))
 	}
 	return true, nil
+}
+
+// Parse aggregate function
+func ParseAggregateFn(tokens []Token, pointer int) (Token, int) {
+	if tokens[pointer+1].Type != TokenLParen || tokens[pointer+3].Type != TokenRParen {
+		panic("Syntax error")
+	}
+	return tokens[pointer+2], pointer + 3
 }
 
 // Get columns of SELECT statement
@@ -60,6 +69,9 @@ func ParseColumns(tokens []Token, pointer int) ([]Token, int) {
 		isFromStmt, _ := Expect(token, TokenFrom)
 		isComma := IsComma(fmt.Sprintf("%v", token.Value))
 		isStar := IsStar(fmt.Sprintf("%v", token.Value))
+		isAggregateFn := IsAggregateFn(token)
+		// isSum, _ := Expect(token, TokenSum)
+		// isMax, _ := Expect(token, TokenMax)
 
 		if isStar {
 			columns = append(columns, token)
@@ -74,6 +86,33 @@ func ParseColumns(tokens []Token, pointer int) ([]Token, int) {
 		if isNext && !isComma {
 			columns = append(columns, token)
 		}
+
+		if isAggregateFn {
+			fieldToken, endIdx := ParseAggregateFn(tokens, pointer)
+			columns = append(columns, Token{
+				Type:  token.Type,
+				Value: fieldToken.Value,
+			})
+			pointer = endIdx
+		}
+
+		// if isSum {
+		// 	fieldToken, endIdx := ParseAggregateFn(tokens, pointer)
+		// 	columns = append(columns, Token{
+		// 		Type:  TokenSum,
+		// 		Value: fieldToken.Value,
+		// 	})
+		// 	pointer = endIdx
+		// }
+
+		// if isMax {
+		// 	fieldToken, endIdx := ParseSum(tokens, pointer)
+		// 	columns = append(columns, Token{
+		// 		Type:  TokenMax,
+		// 		Value: fieldToken.Value,
+		// 	})
+		// 	pointer = endIdx
+		// }
 		pointer++
 	}
 	pointer--
@@ -127,6 +166,28 @@ func ParseWhere(tokens []Token, pointer int) (Expr, int) {
 	fmt.Printf("ast:%# v", pretty.Formatter(ast))
 
 	return ast, pointer
+}
+
+func ParseGroupBy(tokens []Token, pointer int) ([]Token, int) {
+	groupBy := []Token{}
+	for pointer < len(tokens) {
+		token := tokens[pointer]
+		if IsEOF(token) {
+			break
+		}
+		if token.Type != TokenIdent && !IsComma(Stringify(token.Value)) {
+			break
+		}
+		if token.Type == TokenComma {
+			pointer++
+			continue
+		}
+		if token.Type == TokenIdent {
+			groupBy = append(groupBy, token)
+		}
+		pointer++
+	}
+	return groupBy, pointer
 }
 
 func ParseOrderBy(tokens []Token, pointer int) ([]OrderBySingle, int) {
@@ -201,6 +262,16 @@ func BuildAST(tokens []Token) (AST, error) {
 		// === Parse where ===
 		where, endIdx := ParseWhere(tokens, pointer+1)
 		ast.Where = where
+		pointer = endIdx
+	}
+
+	// === Expect GROUP BY
+	isNext, err = Expect(tokens[pointer], TokenGroupBy)
+
+	if isNext {
+		// === Parse GROUP BY ===
+		groupBy, endIdx := ParseGroupBy(tokens, pointer+1)
+		ast.GroupBy = groupBy
 		pointer = endIdx
 	}
 

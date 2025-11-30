@@ -25,7 +25,7 @@ func main() {
 	// sql := "SELECT * FROM employees ORDER BY salary DESC, age"
 	// sql := "SELECT * FROM employees ORDER BY name DESC, age ASC"
 	// sql := "SELECT * FROM employees LIMIT 1"
-	sql := "SELECT dept FROM employees GROUP BY dept, age"
+	sql := "SELECT AVG(salary), COUNT(id), AVG(age), dept FROM employees GROUP BY dept"
 	tokens := utils.Tokenizer(sql)
 
 	ast, err := utils.BuildAST(tokens)

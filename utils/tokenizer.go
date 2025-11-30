@@ -45,6 +45,11 @@ const (
 	TokenDesc
 
 	TokenGroupBy
+	TokenSum
+	TokenAverage
+	TokenCount
+	TokenMax
+	TokenMin
 )
 
 func IsNumber(code int) bool {
@@ -100,6 +105,17 @@ func IsGroupByStart(str string) bool {
 
 func IsGroupBy(str string) bool {
 	return str == "GROUP BY"
+}
+
+func IsSum(str string) bool {
+	return str == "SUM"
+}
+
+func IsAggregateFn(token Token) bool {
+	aggregateFnType := []TokenType{
+		TokenSum, TokenCount, TokenMax, TokenMin, TokenAverage,
+	}
+	return slices.Contains(aggregateFnType, token.Type)
 }
 
 func IsEOF(token Token) bool {
@@ -182,6 +198,26 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 	case "LIMIT":
 		{
 			return TokenLimit, string(byteArr), endIdx
+		}
+	case "SUM":
+		{
+			return TokenSum, string(byteArr), endIdx
+		}
+	case "COUNT":
+		{
+			return TokenCount, string(byteArr), endIdx
+		}
+	case "AVG":
+		{
+			return TokenAverage, string(byteArr), endIdx
+		}
+	case "MAX":
+		{
+			return TokenMax, string(byteArr), endIdx
+		}
+	case "MIN":
+		{
+			return TokenMin, string(byteArr), endIdx
 		}
 	default:
 		{
@@ -283,8 +319,8 @@ func Tokenizer(sql string) []Token {
 			fmt.Sprintf("%d", char),
 		)
 
+		// If character is a number => parsing to get the whole number
 		if IsNumber(code) {
-			// Number
 			value, endIdx := ParseNumber(pointer, sql)
 			tokens = append(tokens, Token{
 				Type:   TokenNumber,
@@ -293,7 +329,7 @@ func Tokenizer(sql string) []Token {
 				EndPos: endIdx,
 			})
 			pointer = endIdx
-		} else if IsSingleQuote(string(char)) {
+		} else if IsSingleQuote(string(char)) { // If character is single quote => Parsing to get whole string within 2 single quotes
 			value, endIdx := ParseString(pointer, sql)
 			tokens = append(tokens, Token{
 				Type:   TokenString,
@@ -302,7 +338,7 @@ func Tokenizer(sql string) []Token {
 				EndPos: endIdx,
 			})
 			pointer = endIdx
-		} else if IsIdentifier(code) {
+		} else if IsIdentifier(code) { // If character is a string => Parsing to get the whole identifier
 			tokenType, value, endIdx := ParseIdentifier(pointer, sql)
 			tokens = append(tokens, Token{
 				Type:   tokenType,
@@ -311,13 +347,13 @@ func Tokenizer(sql string) []Token {
 				EndPos: endIdx,
 			})
 			pointer = endIdx
-		} else if IsComma(string(char)) {
+		} else if IsComma(string(char)) { // If character is a comma => Parsing to get comma
 			tokens = append(tokens, Token{
 				Type:  TokenComma,
 				Value: string(char),
 				Pos:   pointer,
 			})
-		} else if IsOperator(string(char)) {
+		} else if IsOperator(string(char)) { // If charater is a operator => Parsing to get operator
 			tokenType, value, endIdx := ParseOperator(pointer, sql)
 			tokens = append(tokens, Token{
 				Type:   tokenType,
@@ -327,7 +363,7 @@ func Tokenizer(sql string) []Token {
 			})
 			pointer = endIdx
 
-		} else if IsStar(string(char)) {
+		} else if IsStar(string(char)) { // If character is "*" => Parsing to get "*"
 			tokens = append(tokens, Token{
 				Type:  TokenStar,
 				Value: string(char),
