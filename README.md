@@ -1,6 +1,7 @@
 ### Support statement ###
 
 - [x] SELECT
+    - [x] AS
 - [x] FROM
 - [x] WHERE
     - [x] Compare operators (>, >=, <, <=, <>, =)
@@ -11,3 +12,4 @@
     - [x] ASC
     - [x] DESC
 - [x] LIMIT
+- [x] GROUP BY

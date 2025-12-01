@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	// sql := "SELECT name,salary, age FROM employees WHERE salary > 50000 AND age >=30"
+	// sql := "SELECT name AS name__123, salary, age FROM employees WHERE salary > 50000 AND age >=30"
 	// sql := "SELECT * FROM employees WHERE salary >= 50000 AND age >= 30 AND id >= 2"
 	// sql := "SELECT * FROM employees WHERE age <> 40"
 	// sql := "SELECT * FROM employees WHERE age BETWEEN 30 AND 40 AND salary > 50000"
@@ -25,7 +25,9 @@ func main() {
 	// sql := "SELECT * FROM employees ORDER BY salary DESC, age"
 	// sql := "SELECT * FROM employees ORDER BY name DESC, age ASC"
 	// sql := "SELECT * FROM employees LIMIT 1"
-	sql := "SELECT AVG(salary), COUNT(id), AVG(age), dept FROM employees GROUP BY dept"
+	sql := "SELECT AVG(salary) AS avg_salary123, COUNT(id), AVG(age) AS avg_age, dept FROM employees GROUP BY dept"
+	// sql := "SELECT AVG(salary) AS avg_salary, COUNT(id) AS count_id, AVG(age) FROM employees GROUP BY dept"
+
 	tokens := utils.Tokenizer(sql)
 
 	ast, err := utils.BuildAST(tokens)

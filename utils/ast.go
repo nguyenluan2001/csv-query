@@ -33,8 +33,16 @@ type OrderBySingle struct {
 	Direction TokenType
 }
 
+type Column struct {
+	Type   TokenType
+	Value  any
+	Pos    int
+	EndPos int
+	Alias  string
+}
+
 type AST struct {
-	Columns []Token
+	Columns []Column
 	From    Token
 	Where   Expr
 	OrderBy []OrderBySingle
@@ -58,9 +66,16 @@ func ParseAggregateFn(tokens []Token, pointer int) (Token, int) {
 	return tokens[pointer+2], pointer + 3
 }
 
+func ParseAlias(tokens []Token, pointer int) (Token, int) {
+	if tokens[pointer+1].Type != TokenIdent {
+		panic("Syntax error")
+	}
+	return tokens[pointer+1], pointer + 1
+}
+
 // Get columns of SELECT statement
-func ParseColumns(tokens []Token, pointer int) ([]Token, int) {
-	columns := []Token{}
+func ParseColumns(tokens []Token, pointer int) ([]Column, int) {
+	columns := []Column{}
 
 	for pointer < len(tokens) {
 		token := tokens[pointer]
@@ -69,12 +84,23 @@ func ParseColumns(tokens []Token, pointer int) ([]Token, int) {
 		isFromStmt, _ := Expect(token, TokenFrom)
 		isComma := IsComma(fmt.Sprintf("%v", token.Value))
 		isStar := IsStar(fmt.Sprintf("%v", token.Value))
-		isAggregateFn := IsAggregateFn(token)
-		// isSum, _ := Expect(token, TokenSum)
-		// isMax, _ := Expect(token, TokenMax)
+		isAggregateFn := IsAggregateFn(Column{
+			Type:   token.Type,
+			Value:  token.Value,
+			Pos:    token.Pos,
+			EndPos: token.EndPos,
+			Alias:  "",
+		})
+		isAlias, _ := Expect(token, TokenAs)
 
 		if isStar {
-			columns = append(columns, token)
+			columns = append(columns, Column{
+				Type:   token.Type,
+				Value:  token.Value,
+				Pos:    token.Pos,
+				EndPos: token.EndPos,
+				Alias:  "123",
+			})
 			pointer++
 			break
 		}
@@ -84,15 +110,34 @@ func ParseColumns(tokens []Token, pointer int) ([]Token, int) {
 		}
 
 		if isNext && !isComma {
-			columns = append(columns, token)
+			columns = append(columns, Column{
+				Type:   token.Type,
+				Value:  token.Value,
+				Pos:    token.Pos,
+				EndPos: token.EndPos,
+				Alias:  "",
+			})
 		}
 
 		if isAggregateFn {
 			fieldToken, endIdx := ParseAggregateFn(tokens, pointer)
-			columns = append(columns, Token{
+			columns = append(columns, Column{
 				Type:  token.Type,
 				Value: fieldToken.Value,
 			})
+			pointer = endIdx
+		}
+
+		if isAlias {
+			aliasToken, endIdx := ParseAlias(tokens, pointer)
+			lastColumn := columns[len(columns)-1]
+			columns[len(columns)-1] = Column{
+				Type:   lastColumn.Type,
+				Value:  lastColumn.Value,
+				Pos:    lastColumn.Pos,
+				EndPos: lastColumn.EndPos,
+				Alias:  Stringify(aliasToken.Value),
+			}
 			pointer = endIdx
 		}
 

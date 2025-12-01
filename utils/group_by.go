@@ -70,7 +70,7 @@ func GetAggregateCollector(groupByMap map[string]GroupByData, groupByKey, field 
 	return collector
 }
 
-func GetAggregateValue(token Token, collector []string) string {
+func GetAggregateValue(token Column, collector []string) string {
 	switch token.Type {
 	case TokenSum:
 		{

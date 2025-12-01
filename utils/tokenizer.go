@@ -19,6 +19,7 @@ const (
 	TokenEOF TokenType = iota
 	TokenIdent
 	TokenSelect
+	TokenAs
 	TokenNumber
 	TokenString
 	TokenComma
@@ -73,6 +74,10 @@ func IsWhiteSpace(char string) bool {
 	return char == " "
 }
 
+func IsHyphen(char string) bool {
+	return char == "-"
+}
+
 func IsIdentifier(code int) bool {
 	isUppercase := code >= 65 && code <= 90
 	isLowercase := code >= 97 && code <= 122
@@ -89,6 +94,10 @@ func IsLeftParen(char string) bool {
 
 func IsRightParen(char string) bool {
 	return char == ")"
+}
+
+func IsUnderscore(char string) bool {
+	return char == "_"
 }
 
 func IsOrderByStart(str string) bool {
@@ -111,7 +120,7 @@ func IsSum(str string) bool {
 	return str == "SUM"
 }
 
-func IsAggregateFn(token Token) bool {
+func IsAggregateFn(token Column) bool {
 	aggregateFnType := []TokenType{
 		TokenSum, TokenCount, TokenMax, TokenMin, TokenAverage,
 	}
@@ -125,13 +134,21 @@ func IsEOF(token Token) bool {
 func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 	byteArr := []byte{}
 	endIdx := startIdx
+	isHaveUnderscore := false
 	for i := startIdx; i < len(sql); i++ {
 		char := sql[i]
 		code, _ := strconv.Atoi(
 			fmt.Sprintf("%d", char),
 		)
 
-		fmt.Println("IsOrderByStart", string(byteArr), string(char))
+		if IsHyphen(string(char)) {
+			panic(fmt.Sprintf("Syntax error at position %v", i))
+		}
+
+		if IsUnderscore(string(char)) {
+			isHaveUnderscore = true
+		}
+
 		if IsOrderByStart(string(byteArr)) {
 			if IsOrderBy(string(byteArr)) {
 				break
@@ -140,20 +157,38 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 			if IsGroupBy(string(byteArr)) {
 				break
 			}
-		} else if !IsIdentifier(code) || IsWhiteSpace(string(char)) {
-			break
+		} else if !IsIdentifier(code) {
+			// If have underscore => Only stop parse when meet "," or whitespace
+			if isHaveUnderscore {
+				if IsComma(string(char)) || IsWhiteSpace(string(char)) {
+					break
+				}
+			} else {
+				if IsComma(string(char)) || IsWhiteSpace(string(char)) {
+					break
+				}
+
+				if !IsNumber(code) {
+					break
+				}
+			}
 		}
 
 		byteArr = append(byteArr, char)
 		endIdx++
 	}
 	identifier := string(byteArr)
+	fmt.Println("identifier", identifier, startIdx, endIdx)
 	endIdx--
 
 	switch identifier {
 	case "SELECT":
 		{
 			return TokenSelect, string(byteArr), endIdx
+		}
+	case "AS":
+		{
+			return TokenAs, string(byteArr), endIdx
 		}
 	case "FROM":
 		{

@@ -47,7 +47,7 @@ func Min(collector []string) string {
 	return Stringify(collector[0])
 }
 
-func GetAggregateFnName(token Token) string {
+func GetAggregateFnName(token Column) string {
 	switch token.Type {
 	case TokenSum:
 		{
@@ -76,6 +76,6 @@ func GetAggregateFnName(token Token) string {
 	}
 }
 
-func GenerateAggregateColumnName(token Token) string {
+func GenerateAggregateColumnName(token Column) string {
 	return fmt.Sprintf("%v_%v", GetAggregateFnName(token), token.Value)
 }
