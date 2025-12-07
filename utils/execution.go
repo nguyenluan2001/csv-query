@@ -13,8 +13,23 @@ import (
 	"strings"
 )
 
+// GROUP BY
 type Collector []string
 type GroupByData map[string]Collector
+type GroupByRow struct {
+	Data  map[string][][]string
+	Order map[string][]int
+}
+
+// JOIN
+type ScanTableInfo struct {
+	HeaderRow   []string
+	HeaderIndex map[string]int
+	Rows        [][]string
+	GroupByRow  GroupByRow
+}
+
+type JoinHeaderIndex map[string][]int
 
 func ParseHeaderIndex(header []string) map[string]int {
 	headerIndex := map[string]int{}
@@ -66,6 +81,7 @@ func FilterRow(row []string, headerIndex map[string]int, condition BinaryExpr) b
 	return true
 }
 
+// Select field in normal mode
 func SelectField(row []string, headerIndex map[string]int, columns []Column, headerRow []string) ([]string, []string) {
 	newRow := []string{}
 	newHeader := []string{}
@@ -83,6 +99,7 @@ func SelectField(row []string, headerIndex map[string]int, columns []Column, hea
 	return newRow, newHeader
 }
 
+// Select field in GROUP BY mode
 func SelectGroupByField(row []string, headerIndex map[string]int, columns []Column, groupByMap map[string]GroupByData) ([]string, []string) {
 	newRow := []string{}
 	newHeader := []string{}
@@ -105,6 +122,11 @@ func SelectGroupByField(row []string, headerIndex map[string]int, columns []Colu
 		}
 	}
 	return newRow, newHeader
+}
+
+// Select field in JOIN mode
+func SelectJoinField(row []string, headerIndex map[string]JoinHeaderIndex, columns []Column) ([]string, []string) {
+	return []string{}, []string{}
 }
 
 // row1[field] - row2[field] < 0: asc
@@ -150,25 +172,23 @@ func OrderByComparator(conditions []OrderBySingle, headerIndex map[string]int, r
 	return 0
 }
 
-func Execute(ast AST) error {
-
-	// Handle FROM statement
-	cwd, _ := os.Getwd()
-	filepath := path.Join(cwd, "..", fmt.Sprintf("%v.csv", ast.From.Value))
-	fmt.Println(filepath)
-	file, err := os.Open(filepath)
-	if err != nil {
-		log.Fatalln("File not found.")
+func ScanTable(databasePath, name string, groupBy string) ScanTableInfo {
+	filepath := path.Join(databasePath, fmt.Sprintf("%v.csv", name))
+	scanTableInfo := ScanTableInfo{}
+	groupByRow := GroupByRow{
+		Data:  map[string][][]string{},
+		Order: make(map[string][]int),
 	}
 
+	file, err := os.Open(filepath)
+
+	if err != nil {
+		panic(fmt.Sprintf("Table not found: %s", filepath))
+	}
+	defer file.Close()
+
 	csvReader := csv.NewReader(file)
-	originalHeaderRow := []string{}
-	headerRow := []string{}
-	headerIndex := map[string]int{}
-	result := [][]string{}
-	groupByMap := map[string]GroupByData{}
-	groupByTable := [][]string{}
-	groupByHeader := []string{}
+	rowCount := 0
 	for {
 		row, err := csvReader.Read()
 		if err == io.EOF {
@@ -178,36 +198,171 @@ func Execute(ast AST) error {
 			// Handle error during reading
 		}
 
-		if len(originalHeaderRow) == 0 {
-			originalHeaderRow = row
-			headerIndex = ParseHeaderIndex(originalHeaderRow)
+		if len(scanTableInfo.HeaderRow) == 0 {
+			// originalHeaderRow = row
+			scanTableInfo.HeaderRow = row
+			scanTableInfo.HeaderIndex = ParseHeaderIndex(scanTableInfo.HeaderRow)
 			continue
 		}
 
-		var isValid interface{}
+		if len(groupBy) > 0 {
+			headerIdx, _ := scanTableInfo.HeaderIndex[groupBy]
+			groupByValue := row[headerIdx]
 
-		//Handle WHERE statement
-		if ast.Where != nil {
-			isValid = Eval(ast.Where, row, headerIndex)
-		}
-		if isValid == 0 {
-			continue
-		}
+			_, ok := groupByRow.Data[groupByValue]
 
-		if ast.GroupBy == nil { // In case no GROUP BY => Process SELECT columns
-			//Handle SELECT statement
-			newRow, newHeader := SelectField(row, headerIndex, ast.Columns, originalHeaderRow)
-			result = append(result, newRow)
-
-			headerRow = newHeader
-		} else { // In case GROUP BY => Process groupByMap and groupByTable
-			groupByFields, groupByData, otherFields, otherData, key := ProcessGroupByPerRow(row, originalHeaderRow, headerIndex, ast.GroupBy)
-			isGrouped := AppendGroupByData(groupByMap, key, otherFields, otherData)
-			if !isGrouped {
-				groupByTable = append(groupByTable, BuildGroupByRow(groupByFields, groupByData, originalHeaderRow, key))
+			if !ok {
+				groupByRow.Data[groupByValue] = [][]string{row}
+				groupByRow.Order[groupByValue] = []int{rowCount}
+			} else {
+				groupByRow.Data[groupByValue] = append(groupByRow.Data[groupByValue], row)
+				groupByRow.Order[groupByValue] = append(groupByRow.Order[groupByValue], rowCount)
 			}
-			fmt.Println("key", groupByFields, groupByData, otherFields, otherData, key)
 		}
+
+		// result = append(result, row)
+		scanTableInfo.Rows = append(scanTableInfo.Rows, row)
+		rowCount++
+	}
+	scanTableInfo.GroupByRow = groupByRow
+	return scanTableInfo
+}
+
+func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, map[string]JoinHeaderIndex) {
+	leftTableToken, isLeftSingleTable := joinExpr.Left.(Token)
+	rightTableToken, isRightSingleTable := joinExpr.Right.(Token)
+	leftScanTableInfo := ScanTableInfo{}
+	rightScanTableInfo := ScanTableInfo{}
+	joinHeader := []string{}
+	joinHeaderIndex := map[string]JoinHeaderIndex{
+		"global": make(JoinHeaderIndex),
+	}
+
+	condition, _ := joinExpr.Condition.(BinaryExpr)
+
+	if isLeftSingleTable {
+		leftCondition, _ := condition.Left.(TableIdentifier)
+		tableName := Stringify(leftTableToken.Value)
+		groupByField := Stringify(leftCondition.Field.Value)
+
+		leftScanTableInfo = ScanTable(databasePath, tableName, groupByField)
+
+		joinHeader = append(joinHeader, leftScanTableInfo.HeaderRow...)
+		joinHeaderIndex[tableName] = make(JoinHeaderIndex)
+		for key, value := range leftScanTableInfo.HeaderIndex {
+			joinHeaderIndex["global"][key] = []int{value}
+			joinHeaderIndex[tableName][key] = []int{value}
+		}
+		PrintPretty("leftScanTableInfo", leftScanTableInfo)
+	}
+
+	if isRightSingleTable {
+		rightCondition, _ := condition.Right.(TableIdentifier)
+		tableName := Stringify(rightTableToken.Value)
+		groupByField := Stringify(rightCondition.Field.Value)
+
+		rightScanTableInfo = ScanTable(databasePath, tableName, groupByField)
+
+		joinHeader = append(joinHeader, rightScanTableInfo.HeaderRow...)
+		joinHeaderIndex[tableName] = make(JoinHeaderIndex)
+		for key, value := range rightScanTableInfo.HeaderIndex {
+			_, ok := joinHeaderIndex["global"][key]
+			if !ok {
+				joinHeaderIndex["global"][key] = []int{value}
+			} else {
+				joinHeaderIndex["global"][key] = append(joinHeaderIndex["global"][key], value)
+			}
+			joinHeaderIndex[tableName][key] = []int{value}
+		}
+		PrintPretty("rightScanTableInfo", rightScanTableInfo)
+	}
+
+	// result := [][]string{joinHeader}
+	result := make([][]string, len(leftScanTableInfo.Rows))
+	for key, rows := range leftScanTableInfo.GroupByRow.Data {
+		rightRows := rightScanTableInfo.GroupByRow.Data[key]
+		rowOrder := leftScanTableInfo.GroupByRow.Order[key]
+		for i, lRow := range rows {
+			for _, rRow := range rightRows {
+				fullRow := append([]string{}, lRow...)
+				fullRow = append(fullRow, rRow...)
+				// result = append(result, fullRow)
+				result[rowOrder[i]] = fullRow
+			}
+		}
+	}
+	result = append([][]string{joinHeader}, result...)
+	return result, joinHeaderIndex
+}
+
+func Execute(ast AST, databasePath string) error {
+	originalHeaderRow := []string{}
+	headerRow := []string{}
+	headerIndex := map[string]int{}
+	result := [][]string{}
+	groupByMap := map[string]GroupByData{}
+
+	groupByTable := [][]string{}
+	groupByHeader := []string{}
+
+	joinTable := [][]string{}
+	joinHeaderIndex := map[string]JoinHeaderIndex{}
+
+	joinExpr, isJoin := ast.From.(JoinExpr)
+	if !isJoin {
+		from, _ := ast.From.(Token)
+		// Handle FROM statement
+		filepath := path.Join(databasePath, fmt.Sprintf("%v.csv", from.Value))
+		fmt.Println(filepath)
+		file, err := os.Open(filepath)
+		if err != nil {
+			log.Fatalln("File not found.")
+		}
+
+		csvReader := csv.NewReader(file)
+		for {
+			row, err := csvReader.Read()
+			if err == io.EOF {
+				break // End of file reached
+			}
+			if err != nil {
+				// Handle error during reading
+			}
+
+			if len(originalHeaderRow) == 0 {
+				originalHeaderRow = row
+				headerIndex = ParseHeaderIndex(originalHeaderRow)
+				continue
+			}
+
+			var isValid interface{}
+
+			//Handle WHERE statement
+			if ast.Where != nil {
+				isValid = Eval(ast.Where, row, headerIndex)
+			}
+			if isValid == 0 {
+				continue
+			}
+
+			if ast.GroupBy == nil { // In case no GROUP BY => Process SELECT columns
+				//Handle SELECT statement
+				newRow, newHeader := SelectField(row, headerIndex, ast.Columns, originalHeaderRow)
+				result = append(result, newRow)
+
+				headerRow = newHeader
+			} else { // In case GROUP BY => Process groupByMap and groupByTable
+				groupByFields, groupByData, otherFields, otherData, key := ProcessGroupByPerRow(row, originalHeaderRow, headerIndex, ast.GroupBy)
+				isGrouped := AppendGroupByData(groupByMap, key, otherFields, otherData)
+				if !isGrouped {
+					groupByTable = append(groupByTable, BuildGroupByRow(groupByFields, groupByData, originalHeaderRow, key))
+				}
+				fmt.Println("key", groupByFields, groupByData, otherFields, otherData, key)
+			}
+		}
+	} else {
+		joinTable, joinHeaderIndex = HandleJoinTable(databasePath, joinExpr)
+		PrintPretty("joinHeaderIndex", joinHeaderIndex)
 	}
 
 	if ast.GroupBy != nil {
@@ -220,6 +375,15 @@ func Execute(ast AST) error {
 			}
 		}
 		// result = append([][]string{groupByHeader}, result...)
+	} else if isJoin {
+		for _, row := range joinTable {
+			newRow, newHeader := SelectJoinField(row, joinHeaderIndex, ast.Columns)
+			result = append(result, newRow)
+
+			if len(groupByHeader) == 0 {
+				groupByHeader = newHeader
+			}
+		}
 	}
 
 	if ast.OrderBy != nil {
@@ -236,7 +400,7 @@ func Execute(ast AST) error {
 	//Adding result header
 	if ast.GroupBy != nil {
 		result = append([][]string{groupByHeader}, result...)
-	} else {
+	} else if !isJoin {
 		result = append([][]string{headerRow}, result...)
 	}
 	PrintPretty("GroupByMap", groupByMap)

@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path"
 
-	"github.com/kr/pretty"
 	"github.com/nguyenluan2001/csv-query/utils"
 )
 
@@ -25,16 +26,52 @@ func main() {
 	// sql := "SELECT * FROM employees ORDER BY salary DESC, age"
 	// sql := "SELECT * FROM employees ORDER BY name DESC, age ASC"
 	// sql := "SELECT * FROM employees LIMIT 1"
-	sql := "SELECT AVG(salary) AS avg_salary123, COUNT(id), AVG(age) AS avg_age, dept FROM employees GROUP BY dept"
+	// sql := "SELECT AVG(salary) AS avg_salary123, COUNT(id), AVG(age) AS avg_age, dept FROM employees GROUP BY dept"
 	// sql := "SELECT AVG(salary) AS avg_salary, COUNT(id) AS count_id, AVG(age) FROM employees GROUP BY dept"
+	// sql := "SELECT COUNT(employee_id), department_id FROM employees_2 GROUP BY department_id"
+	sql := "SELECT employees_2.email, employee_id, email, deparment_name FROM employees_2 JOIN department ON employees_2.department_id = department.department_id"
+	// sql := "employees_2 LEFT JOIN department ON employees_2.department_id = department.department_id AND employees_2.first_name = 'John' "
+
+	// JoinExpr{
+	// 	Type: "LEFT",
+	// 	Left: JoinExpr{
+	// 		Tye:   "INNER",
+	// 		Left:  "employees",
+	// 		Right: "departments",
+	// 		Condition: OnExpr{
+	// 			Left:  "employees.department_id",
+	// 			Op:    "=",
+	// 			Right: "departments.id",
+	// 		},
+	// 	},
+	// 	Right: "job",
+	// 	Condition: OnExpr{
+	// 		Left:  "employees.job_id",
+	// 		Op:    "=",
+	// 		Right: "jobs.id",
+	// 	},
+	// }
 
 	tokens := utils.Tokenizer(sql)
+	fmt.Println("tokens", tokens)
+
+	// p := utils.NewParserFrom(tokens)
+
+	// (*p).RegisterPrefix(utils.TokenNumber, 0)
+	// (*p).RegisterPrefix(utils.TokenString, 0)
+	// (*p).RegisterPrefix(utils.TokenIdent, 0)
+	// (*p).RegisterInfix(utils.TokenOr, 100)
+	// (*p).RegisterInfix(utils.TokenAnd, 200)
+	// (*p).RegisterInfix(utils.TokenEqual, 500)
+	// left, _ := (*p).ParserFromExpression(0)
+	// fmt.Printf("left:%# v", pretty.Formatter(left))
 
 	ast, err := utils.BuildAST(tokens)
-	fmt.Println("tokens", tokens)
-	fmt.Printf("ast:%# v", pretty.Formatter(ast))
-	// fmt.Println("ast", ast.WhereCombine.Right)
+	// fmt.Printf("ast:%# v", pretty.Formatter(ast))
+	utils.PrintPretty("AST", ast)
 	fmt.Println("err", err)
 
-	utils.Execute(ast)
+	cwd, _ := os.Getwd()
+	databasePath := path.Join(cwd, "../database")
+	utils.Execute(ast, databasePath)
 }

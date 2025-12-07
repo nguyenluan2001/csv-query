@@ -51,6 +51,12 @@ const (
 	TokenCount
 	TokenMax
 	TokenMin
+
+	TokenJoin
+	TokenLeftJoin
+	TokenRightJoin
+	TokenOn
+	TokenDot
 )
 
 func IsNumber(code int) bool {
@@ -68,6 +74,10 @@ func IsOperator(char string) bool {
 
 func IsComma(char string) bool {
 	return char == ","
+}
+
+func IsDot(char string) bool {
+	return char == "."
 }
 
 func IsWhiteSpace(char string) bool {
@@ -116,6 +126,22 @@ func IsGroupBy(str string) bool {
 	return str == "GROUP BY"
 }
 
+func IsLeftJoinStart(str string) bool {
+	return str == "LEFT"
+}
+
+func IsLeftJoin(str string) bool {
+	return str == "LEFT JOIN"
+}
+
+func IsRightJoinStart(str string) bool {
+	return str == "RIGHT"
+}
+
+func IsRightJoin(str string) bool {
+	return str == "RIGHT JOIN"
+}
+
 func IsSum(str string) bool {
 	return str == "SUM"
 }
@@ -157,14 +183,22 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 			if IsGroupBy(string(byteArr)) {
 				break
 			}
+		} else if IsLeftJoinStart(string(byteArr)) {
+			if IsLeftJoin(string(byteArr)) {
+				break
+			}
+		} else if IsRightJoinStart(string(byteArr)) {
+			if IsRightJoin(string(byteArr)) {
+				break
+			}
 		} else if !IsIdentifier(code) {
 			// If have underscore => Only stop parse when meet "," or whitespace
 			if isHaveUnderscore {
-				if IsComma(string(char)) || IsWhiteSpace(string(char)) {
+				if IsComma(string(char)) || IsWhiteSpace(string(char)) || IsRightParen(string(char)) || IsDot(string(char)) {
 					break
 				}
 			} else {
-				if IsComma(string(char)) || IsWhiteSpace(string(char)) {
+				if IsComma(string(char)) || IsWhiteSpace(string(char)) || IsDot(string(char)) {
 					break
 				}
 
@@ -253,6 +287,22 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 	case "MIN":
 		{
 			return TokenMin, string(byteArr), endIdx
+		}
+	case "JOIN":
+		{
+			return TokenJoin, string(byteArr), endIdx
+		}
+	case "LEFT JOIN":
+		{
+			return TokenLeftJoin, string(byteArr), endIdx
+		}
+	case "RIGHT JOIN":
+		{
+			return TokenRightJoin, string(byteArr), endIdx
+		}
+	case "ON":
+		{
+			return TokenOn, string(byteArr), endIdx
 		}
 	default:
 		{
@@ -388,6 +438,13 @@ func Tokenizer(sql string) []Token {
 				Value: string(char),
 				Pos:   pointer,
 			})
+		} else if IsDot(string(char)) {
+			tokens = append(tokens, Token{
+				Type:  TokenDot,
+				Value: string(char),
+				Pos:   pointer,
+			})
+
 		} else if IsOperator(string(char)) { // If charater is a operator => Parsing to get operator
 			tokenType, value, endIdx := ParseOperator(pointer, sql)
 			tokens = append(tokens, Token{

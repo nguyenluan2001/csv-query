@@ -35,7 +35,7 @@ type OrderBySingle struct {
 
 type Column struct {
 	Type   TokenType
-	Value  any
+	Value  interface{}
 	Pos    int
 	EndPos int
 	Alias  string
@@ -43,7 +43,7 @@ type Column struct {
 
 type AST struct {
 	Columns []Column
-	From    Token
+	From    interface{}
 	Where   Expr
 	OrderBy []OrderBySingle
 	Limit   int
@@ -73,6 +73,39 @@ func ParseAlias(tokens []Token, pointer int) (Token, int) {
 	return tokens[pointer+1], pointer + 1
 }
 
+func ParseColumn(tokens []Token, pointer int) (Column, int) {
+	token := tokens[pointer]
+	pointer++
+	nextToken := tokens[pointer]
+	isDot := IsDot(Stringify(nextToken.Value))
+
+	if !isDot {
+		pointer--
+		return Column{
+			Type:   token.Type,
+			Value:  token.Value,
+			Pos:    token.Pos,
+			EndPos: token.EndPos,
+			Alias:  "",
+		}, pointer
+	}
+
+	pointer++
+	nextToken = tokens[pointer]
+
+	if nextToken.Type != TokenIdent {
+		panic("Syntax error")
+	}
+
+	return Column{
+		Type:   token.Type,
+		Value:  []string{Stringify(token.Value), Stringify(nextToken.Value)},
+		Pos:    token.Pos,
+		EndPos: token.EndPos,
+		Alias:  "",
+	}, pointer
+}
+
 // Get columns of SELECT statement
 func ParseColumns(tokens []Token, pointer int) ([]Column, int) {
 	columns := []Column{}
@@ -82,8 +115,8 @@ func ParseColumns(tokens []Token, pointer int) ([]Column, int) {
 		fmt.Println("pointer", pointer, token)
 		isNext, _ := Expect(token, TokenIdent)
 		isFromStmt, _ := Expect(token, TokenFrom)
-		isComma := IsComma(fmt.Sprintf("%v", token.Value))
-		isStar := IsStar(fmt.Sprintf("%v", token.Value))
+		isComma := IsComma(Stringify(token.Value))
+		isStar := IsStar(Stringify(token.Value))
 		isAggregateFn := IsAggregateFn(Column{
 			Type:   token.Type,
 			Value:  token.Value,
@@ -110,13 +143,16 @@ func ParseColumns(tokens []Token, pointer int) ([]Column, int) {
 		}
 
 		if isNext && !isComma {
-			columns = append(columns, Column{
-				Type:   token.Type,
-				Value:  token.Value,
-				Pos:    token.Pos,
-				EndPos: token.EndPos,
-				Alias:  "",
-			})
+			// columns = append(columns, Column{
+			// 	Type:   token.Type,
+			// 	Value:  token.Value,
+			// 	Pos:    token.Pos,
+			// 	EndPos: token.EndPos,
+			// 	Alias:  "",
+			// })
+			column, endIdx := ParseColumn(tokens, pointer)
+			columns = append(columns, column)
+			pointer = endIdx
 		}
 
 		if isAggregateFn {
@@ -165,8 +201,36 @@ func ParseColumns(tokens []Token, pointer int) ([]Column, int) {
 }
 
 // Get table of FROM statement
-func ParseFrom(tokens []Token, pointer int) (Token, int) {
-	return tokens[pointer], pointer
+
+func CheckStopParseFrom(token Token) bool {
+	stopTokens := []TokenType{TokenWhere, TokenGroupBy, TokenOrderBy, TokenLimit, TokenEOF}
+	return slices.Contains(stopTokens, token.Type)
+}
+func ParseFrom(tokens []Token, pointer int) (interface{}, int) {
+	// return tokens[pointer], pointer
+	fromTokens := []Token{}
+	for pointer < len(tokens) {
+		token := tokens[pointer]
+		if CheckStopParseFrom(token) {
+			fromTokens = append(fromTokens, tokens[len(tokens)-1])
+			break
+		}
+		fromTokens = append(fromTokens, token)
+		pointer++
+	}
+	fmt.Println("fromTokens", fromTokens)
+
+	p := NewParserFrom(fromTokens)
+
+	(*p).RegisterPrefix(TokenNumber, 0)
+	(*p).RegisterPrefix(TokenString, 0)
+	(*p).RegisterPrefix(TokenIdent, 0)
+	(*p).RegisterInfix(TokenOr, 100)
+	(*p).RegisterInfix(TokenAnd, 200)
+	(*p).RegisterInfix(TokenEqual, 500)
+	fromExpression, _ := (*p).ParserFromExpression(0)
+	return fromExpression, pointer
+
 }
 
 func CheckStopParseWhere(token Token) bool {
@@ -297,7 +361,8 @@ func BuildAST(tokens []Token) (AST, error) {
 
 	// === Parse from ===
 	from, endIdx := ParseFrom(tokens, pointer)
-	pointer = endIdx + 1
+	// pointer = endIdx + 1
+	pointer = endIdx
 	ast.From = from
 
 	// === Expect WHERE
