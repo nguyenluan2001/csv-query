@@ -29,7 +29,8 @@ func main() {
 	// sql := "SELECT AVG(salary) AS avg_salary123, COUNT(id), AVG(age) AS avg_age, dept FROM employees GROUP BY dept"
 	// sql := "SELECT AVG(salary) AS avg_salary, COUNT(id) AS count_id, AVG(age) FROM employees GROUP BY dept"
 	// sql := "SELECT COUNT(employee_id), department_id FROM employees_2 GROUP BY department_id"
-	sql := "SELECT employees_2.email, employee_id, email, deparment_name FROM employees_2 JOIN department ON employees_2.department_id = department.department_id"
+	// sql := "SELECT employees_2.email, department_name, budget FROM employees_2 JOIN department ON employees_2.department_id = department.department_id ORDER BY budget LIMIT 3"
+	sql := "SELECT employees_2.email, job_title, min_salary, max_salary FROM employees_2 JOIN job ON employees_2.job_id = job.job_id"
 	// sql := "employees_2 LEFT JOIN department ON employees_2.department_id = department.department_id AND employees_2.first_name = 'John' "
 
 	// JoinExpr{

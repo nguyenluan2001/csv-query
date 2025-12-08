@@ -126,7 +126,27 @@ func SelectGroupByField(row []string, headerIndex map[string]int, columns []Colu
 
 // Select field in JOIN mode
 func SelectJoinField(row []string, headerIndex map[string]JoinHeaderIndex, columns []Column) ([]string, []string) {
-	return []string{}, []string{}
+	header := []string{}
+	newRow := []string{}
+	for _, col := range columns {
+		valueArr, isArray := col.Value.([]string)
+
+		colName := Stringify(col.Value)
+		var headerIdx []int
+		if !isArray {
+			headerIdx = headerIndex["global"][colName]
+			if len(headerIdx) > 1 {
+				panic(fmt.Sprintf(`Column reference "%v" is ambiguous `, colName))
+			}
+		} else {
+			headerIdx = headerIndex[valueArr[0]][valueArr[1]]
+			colName = valueArr[1]
+		}
+		header = append(header, colName)
+		newRow = append(newRow, row[headerIdx[0]])
+	}
+	// return []string{}, []string{}
+	return newRow, header
 }
 
 // row1[field] - row2[field] < 0: asc
@@ -237,6 +257,7 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, map[st
 	joinHeaderIndex := map[string]JoinHeaderIndex{
 		"global": make(JoinHeaderIndex),
 	}
+	columnIdx := 0
 
 	condition, _ := joinExpr.Condition.(BinaryExpr)
 
@@ -252,6 +273,7 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, map[st
 		for key, value := range leftScanTableInfo.HeaderIndex {
 			joinHeaderIndex["global"][key] = []int{value}
 			joinHeaderIndex[tableName][key] = []int{value}
+			columnIdx++
 		}
 		PrintPretty("leftScanTableInfo", leftScanTableInfo)
 	}
@@ -268,11 +290,11 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, map[st
 		for key, value := range rightScanTableInfo.HeaderIndex {
 			_, ok := joinHeaderIndex["global"][key]
 			if !ok {
-				joinHeaderIndex["global"][key] = []int{value}
+				joinHeaderIndex["global"][key] = []int{value + columnIdx}
 			} else {
-				joinHeaderIndex["global"][key] = append(joinHeaderIndex["global"][key], value)
+				joinHeaderIndex["global"][key] = append(joinHeaderIndex["global"][key], value+columnIdx)
 			}
-			joinHeaderIndex[tableName][key] = []int{value}
+			joinHeaderIndex[tableName][key] = []int{value + columnIdx}
 		}
 		PrintPretty("rightScanTableInfo", rightScanTableInfo)
 	}
@@ -307,6 +329,7 @@ func Execute(ast AST, databasePath string) error {
 
 	joinTable := [][]string{}
 	joinHeaderIndex := map[string]JoinHeaderIndex{}
+	joinHeader := []string{}
 
 	joinExpr, isJoin := ast.From.(JoinExpr)
 	if !isJoin {
@@ -376,13 +399,17 @@ func Execute(ast AST, databasePath string) error {
 		}
 		// result = append([][]string{groupByHeader}, result...)
 	} else if isJoin {
-		for _, row := range joinTable {
+		PrintPretty("joinTable", joinTable)
+		for i := 1; i < len(joinTable); i++ {
+			row := joinTable[i]
 			newRow, newHeader := SelectJoinField(row, joinHeaderIndex, ast.Columns)
 			result = append(result, newRow)
 
-			if len(groupByHeader) == 0 {
-				groupByHeader = newHeader
+			if len(joinHeader) == 0 {
+				joinHeader = newHeader
+				headerIndex = ParseHeaderIndex(newHeader)
 			}
+
 		}
 	}
 
@@ -400,7 +427,9 @@ func Execute(ast AST, databasePath string) error {
 	//Adding result header
 	if ast.GroupBy != nil {
 		result = append([][]string{groupByHeader}, result...)
-	} else if !isJoin {
+	} else if isJoin {
+		result = append([][]string{joinHeader}, result...)
+	} else {
 		result = append([][]string{headerRow}, result...)
 	}
 	PrintPretty("GroupByMap", groupByMap)

@@ -201,7 +201,6 @@ func ParseColumns(tokens []Token, pointer int) ([]Column, int) {
 }
 
 // Get table of FROM statement
-
 func CheckStopParseFrom(token Token) bool {
 	stopTokens := []TokenType{TokenWhere, TokenGroupBy, TokenOrderBy, TokenLimit, TokenEOF}
 	return slices.Contains(stopTokens, token.Type)
@@ -212,6 +211,7 @@ func ParseFrom(tokens []Token, pointer int) (interface{}, int) {
 	for pointer < len(tokens) {
 		token := tokens[pointer]
 		if CheckStopParseFrom(token) {
+			pointer--
 			fromTokens = append(fromTokens, tokens[len(tokens)-1])
 			break
 		}
@@ -230,7 +230,6 @@ func ParseFrom(tokens []Token, pointer int) (interface{}, int) {
 	(*p).RegisterInfix(TokenEqual, 500)
 	fromExpression, _ := (*p).ParserFromExpression(0)
 	return fromExpression, pointer
-
 }
 
 func CheckStopParseWhere(token Token) bool {
@@ -299,10 +298,19 @@ func ParseGroupBy(tokens []Token, pointer int) ([]Token, int) {
 	return groupBy, pointer
 }
 
+// === Parse ORDER BY tokens ===
+func CheckStopParseOrderBy(token Token) bool {
+	stopTokens := []TokenType{TokenLimit, TokenEOF}
+	return slices.Contains(stopTokens, token.Type)
+}
 func ParseOrderBy(tokens []Token, pointer int) ([]OrderBySingle, int) {
 	orderBy := []OrderBySingle{}
 	for pointer < len(tokens) {
 		token := tokens[pointer]
+		if CheckStopParseOrderBy(token) {
+			pointer--
+			return orderBy, pointer
+		}
 		if token.Type == TokenComma {
 			pointer++
 			continue
@@ -321,6 +329,7 @@ func ParseOrderBy(tokens []Token, pointer int) ([]OrderBySingle, int) {
 	return orderBy, pointer
 }
 
+// === Parse LIMIT tokens ===
 func ParseLimit(tokens []Token, pointer int) (int, int) {
 	limit := -1
 	for pointer < len(tokens) {
@@ -356,14 +365,16 @@ func BuildAST(tokens []Token) (AST, error) {
 	isNext, err = Expect(tokens[pointer], TokenFrom)
 	if !isNext {
 		return ast, err
-	}
-	pointer++
+	} else {
+		pointer++
 
-	// === Parse from ===
-	from, endIdx := ParseFrom(tokens, pointer)
-	// pointer = endIdx + 1
-	pointer = endIdx
-	ast.From = from
+		// === Parse from ===
+		from, endIdx := ParseFrom(tokens, pointer)
+		PrintPretty("END IDX===", endIdx)
+		pointer = endIdx + 1
+		// pointer = endIdx
+		ast.From = from
+	}
 
 	// === Expect WHERE
 	isNext, err = Expect(tokens[pointer], TokenWhere)
@@ -391,6 +402,7 @@ func BuildAST(tokens []Token) (AST, error) {
 		orderBy, endIdx := ParseOrderBy(tokens, pointer)
 		ast.OrderBy = orderBy
 		pointer = endIdx + 1
+		PrintPretty("pointer", pointer)
 	}
 
 	// === Expect LIMIT ===

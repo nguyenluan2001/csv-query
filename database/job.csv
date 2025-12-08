@@ -1,0 +1,11 @@
+job_id,job_title,min_salary,max_salary
+1,HR Director,70000,90000
+2,Senior Software Engineer,80000,120000
+3,HR Specialist,55000,75000
+4,Sales Manager,65000,95000
+5,Software Developer,55000,85000
+6,Marketing Director,75000,110000
+7,Sales Representative,45000,70000
+8,Junior Developer,50000,70000
+9,Marketing Coordinator,50000,70000
+10,DevOps Engineer,70000,100000
