@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/nguyenluan2001/csv-query/utils"
 )
@@ -30,9 +31,19 @@ func main() {
 	// sql := "SELECT AVG(salary) AS avg_salary, COUNT(id) AS count_id, AVG(age) FROM employees GROUP BY dept"
 	// sql := "SELECT COUNT(employee_id), department_id FROM employees_2 GROUP BY department_id"
 	// sql := "SELECT employees_2.email, department_name, budget FROM employees_2 JOIN department ON employees_2.department_id = department.department_id ORDER BY budget LIMIT 3"
-	sql := "SELECT employees_2.email, job_title, min_salary, max_salary FROM employees_2 JOIN job ON employees_2.job_id = job.job_id"
+	// sql := "SELECT employees_2.email, job_title, min_salary, max_salary FROM employees_2 JOIN job ON employees_2.job_id = job.job_id"
 	// sql := "employees_2 LEFT JOIN department ON employees_2.department_id = department.department_id AND employees_2.first_name = 'John' "
+	sql := `SELECT employees_2.email, job_title, min_salary, max_salary 
+			FROM employees_2 
+			JOIN job ON employees_2.job_id = job.job_id
+			JOIN department ON employees_2.department_id = department.department_id
+			`
 
+	// JOIN department ON employees_2.department_id = department.department_id
+	replacer := strings.NewReplacer("\n", " ", "\t", " ")
+	sql = replacer.Replace(sql)
+
+	fmt.Printf("sql: %v", sql)
 	// JoinExpr{
 	// 	Type: "LEFT",
 	// 	Left: JoinExpr{

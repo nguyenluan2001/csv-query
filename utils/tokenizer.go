@@ -84,6 +84,18 @@ func IsWhiteSpace(char string) bool {
 	return char == " "
 }
 
+func IsNewLine(char string) bool {
+	return char == `\n`
+}
+
+func IsTab(char string) bool {
+	return char == `\t`
+}
+
+func IsSkipParsing(char string) bool {
+	return IsWhiteSpace(char) || IsNewLine(char) || IsTab(char)
+}
+
 func IsHyphen(char string) bool {
 	return char == "-"
 }
@@ -194,11 +206,11 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 		} else if !IsIdentifier(code) {
 			// If have underscore => Only stop parse when meet "," or whitespace
 			if isHaveUnderscore {
-				if IsComma(string(char)) || IsWhiteSpace(string(char)) || IsRightParen(string(char)) || IsDot(string(char)) {
+				if IsComma(string(char)) || IsSkipParsing(string(char)) || IsRightParen(string(char)) || IsDot(string(char)) {
 					break
 				}
 			} else {
-				if IsComma(string(char)) || IsWhiteSpace(string(char)) || IsDot(string(char)) {
+				if IsComma(string(char)) || IsSkipParsing(string(char)) || IsDot(string(char)) {
 					break
 				}
 
@@ -320,7 +332,7 @@ func ParseNumber(startIdx int, sql string) (int, int) {
 		code, _ := strconv.Atoi(
 			fmt.Sprintf("%d", char),
 		)
-		if !IsNumber(code) || IsWhiteSpace(string(char)) {
+		if !IsNumber(code) || IsSkipParsing(string(char)) {
 			break
 		}
 		numberArr = append(numberArr, char)
@@ -355,7 +367,7 @@ func ParseOperator(startIdx int, sql string) (TokenType, string, int) {
 	endIdx := startIdx
 	for i := startIdx; i < len(sql); i++ {
 		char := sql[i]
-		if !IsOperator(string(char)) || IsWhiteSpace(string(char)) {
+		if !IsOperator(string(char)) || IsSkipParsing(string(char)) {
 			break
 		}
 		byteArr = append(byteArr, char)

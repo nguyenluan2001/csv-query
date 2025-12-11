@@ -1,6 +1,8 @@
 package utils
 
-import "slices"
+import (
+	"slices"
+)
 
 type ParserFrom struct {
 	tokens  []Token
@@ -78,7 +80,7 @@ func (p *ParserFrom) Advance() {
 	}
 }
 
-func (p *ParserFrom) ParseJoin(joinToken Token, left Token) JoinExpr {
+func (p *ParserFrom) ParseJoin(joinToken Token, left interface{}) JoinExpr {
 	right, condition := p.ParserFromExpression(0)
 	return JoinExpr{
 		Type:      joinToken,
@@ -143,15 +145,16 @@ func (p *ParserFrom) ParserFromExpression(minBP int) (interface{}, interface{}) 
 		left = t
 	}
 
-	if CheckJoinToken(p.current) {
-		joinToken := p.current
-		p.Advance()
-		left = p.ParseJoin(joinToken, t)
-	}
 	if p.current.Type == TokenOn {
 		p.Advance()
 		condition = p.ParseOnCondition(0)
 		// condition = nil
+	}
+
+	for CheckJoinToken(p.current) && condition == nil {
+		joinToken := p.current
+		p.Advance()
+		left = p.ParseJoin(joinToken, left)
 	}
 	return left, condition
 }
