@@ -248,7 +248,7 @@ func ScanTable(databasePath, name string, groupBy string) ScanTableInfo {
 	return scanTableInfo
 }
 
-func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, map[string]JoinHeaderIndex, []string) {
+func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, [][]string, map[string]JoinHeaderIndex, []string, GroupByRow) {
 	leftTableToken, isLeftSingleTable := joinExpr.Left.(Token)
 	rightTableToken, isRightSingleTable := joinExpr.Right.(Token)
 	leftScanTableInfo := ScanTableInfo{}
@@ -257,6 +257,7 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, map[st
 	joinHeaderIndex := map[string]JoinHeaderIndex{
 		"global": make(JoinHeaderIndex),
 	}
+	leftGroupByRow := GroupByRow{}
 	columnIdx := 0
 
 	condition, _ := joinExpr.Condition.(BinaryExpr)
@@ -276,18 +277,27 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, map[st
 			columnIdx++
 		}
 		PrintPretty("leftScanTableInfo", leftScanTableInfo)
+		leftGroupByRow = leftScanTableInfo.GroupByRow
 	} else {
 		joinExpr, _ := joinExpr.Left.(JoinExpr)
-		_result, _joinHeaderIndex, _joinHeader := HandleJoinTable(databasePath, joinExpr)
+		_, _rows, _joinHeaderIndex, _joinHeader, _groupByRow := HandleJoinTable(databasePath, joinExpr)
 		joinHeader = append(joinHeader, _joinHeader...)
-		leftScanTableInfo.Rows = _result
+		leftScanTableInfo.Rows = _rows
 		leftScanTableInfo.HeaderRow = _joinHeader
+		leftGroupByRow = _groupByRow
 		PrintPretty("_joinHeaderIndex", _joinHeaderIndex)
+		PrintPretty("leftScanTableInfo", leftScanTableInfo)
+		PrintPretty("leftGroupByRow", leftGroupByRow)
 		for groupKey, groupHash := range _joinHeaderIndex {
 			for key, value := range groupHash {
+				_, ok := joinHeaderIndex[groupKey]
+				if !ok {
+					joinHeaderIndex[groupKey] = make(JoinHeaderIndex)
+				}
 				joinHeaderIndex[groupKey][key] = value
-				joinHeaderIndex[groupKey][key] = value
-				columnIdx++
+				if groupKey != "global" {
+					columnIdx++
+				}
 			}
 		}
 
@@ -314,22 +324,31 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, map[st
 		PrintPretty("rightScanTableInfo", rightScanTableInfo)
 	}
 
-	// result := [][]string{joinHeader}
 	result := make([][]string, len(leftScanTableInfo.Rows))
-	for key, rows := range leftScanTableInfo.GroupByRow.Data {
+	for key, rows := range leftGroupByRow.Data {
 		rightRows := rightScanTableInfo.GroupByRow.Data[key]
-		rowOrder := leftScanTableInfo.GroupByRow.Order[key]
-		for i, lRow := range rows {
+		rightOrders := rightScanTableInfo.GroupByRow.Order[key]
+		rowOrder := leftGroupByRow.Order[key]
+		for lIdx, lRow := range rows {
 			for _, rRow := range rightRows {
 				fullRow := append([]string{}, lRow...)
 				fullRow = append(fullRow, rRow...)
-				// result = append(result, fullRow)
-				result[rowOrder[i]] = fullRow
+				result[rowOrder[lIdx]] = fullRow
+				leftGroupByRow.Data[key][lIdx] = append(leftGroupByRow.Data[key][lIdx], rRow...)
+				leftGroupByRow.Order[key] = append(leftGroupByRow.Order[key], rightOrders...)
 			}
 		}
 	}
-	result = append([][]string{joinHeader}, result...)
-	return result, joinHeaderIndex, joinHeader
+
+	notNullResult := [][]string{}
+	for _, row := range result {
+		if row == nil {
+			continue
+		}
+		notNullResult = append(notNullResult, row)
+	}
+	result = append([][]string{joinHeader}, notNullResult...)
+	return result, notNullResult, joinHeaderIndex, joinHeader, leftGroupByRow
 }
 
 func Execute(ast AST, databasePath string) error {
@@ -399,7 +418,7 @@ func Execute(ast AST, databasePath string) error {
 			}
 		}
 	} else {
-		joinTable, joinHeaderIndex, _ = HandleJoinTable(databasePath, joinExpr)
+		joinTable, _, joinHeaderIndex, _, _ = HandleJoinTable(databasePath, joinExpr)
 		PrintPretty("joinHeaderIndex", joinHeaderIndex)
 	}
 

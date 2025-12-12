@@ -33,7 +33,7 @@ func main() {
 	// sql := "SELECT employees_2.email, department_name, budget FROM employees_2 JOIN department ON employees_2.department_id = department.department_id ORDER BY budget LIMIT 3"
 	// sql := "SELECT employees_2.email, job_title, min_salary, max_salary FROM employees_2 JOIN job ON employees_2.job_id = job.job_id"
 	// sql := "employees_2 LEFT JOIN department ON employees_2.department_id = department.department_id AND employees_2.first_name = 'John' "
-	sql := `SELECT employees_2.email, job_title, min_salary, max_salary 
+	sql := `SELECT employees_2.email, department_name,,location, job.job_title, job.min_salary, job.max_salary 
 			FROM employees_2 
 			JOIN job ON employees_2.job_id = job.job_id
 			JOIN department ON employees_2.department_id = department.department_id
