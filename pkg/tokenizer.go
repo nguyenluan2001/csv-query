@@ -224,7 +224,6 @@ func ParseIdentifier(startIdx int, sql string) (TokenType, string, int) {
 		endIdx++
 	}
 	identifier := string(byteArr)
-	fmt.Println("identifier", identifier, startIdx, endIdx)
 	endIdx--
 
 	switch identifier {
@@ -375,7 +374,6 @@ func ParseOperator(startIdx int, sql string) (TokenType, string, int) {
 
 	}
 	identifier := string(byteArr)
-	fmt.Println("identifier", identifier)
 	endIdx--
 
 	switch identifier {

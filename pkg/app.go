@@ -17,6 +17,7 @@ type CSVQL struct {
 	Result       [][]string
 	Duration     float64
 	Readline     *readline.Instance
+	Variables    map[string]string
 	Error        error
 }
 
@@ -35,6 +36,7 @@ func NewQuery(sql string, databasePath string) CSVQL {
 		Tokens:       []Token{},
 		Ast:          AST{},
 		Result:       [][]string{},
+		Variables:    map[string]string{},
 	}
 
 	return query

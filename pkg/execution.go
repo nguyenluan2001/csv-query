@@ -111,7 +111,7 @@ func SelectGroupByField(row []string, headerIndex map[string]int, columns []Colu
 		} else {
 			// aggregateFn := GetAggregateFn(col)
 			collector := GetAggregateCollector(groupByMap, row[headerIdx], Stringify(col.Value))
-			PrintPretty("collector", collector)
+			// PrintPretty("collector", collector)
 			aggregateVal := GetAggregateValue(col, collector)
 			newRow = append(newRow, aggregateVal)
 			newHeader = append(newHeader, GenerateAggregateColumnName(col))
@@ -276,7 +276,7 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, [][]st
 			joinHeaderIndex[tableName][key] = []int{value}
 			columnIdx++
 		}
-		PrintPretty("leftScanTableInfo", leftScanTableInfo)
+		// PrintPretty("leftScanTableInfo", leftScanTableInfo)
 		leftGroupByRow = leftScanTableInfo.GroupByRow
 	} else {
 		joinExpr, _ := joinExpr.Left.(JoinExpr)
@@ -285,9 +285,9 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, [][]st
 		leftScanTableInfo.Rows = _rows
 		leftScanTableInfo.HeaderRow = _joinHeader
 		leftGroupByRow = _groupByRow
-		PrintPretty("_joinHeaderIndex", _joinHeaderIndex)
-		PrintPretty("leftScanTableInfo", leftScanTableInfo)
-		PrintPretty("leftGroupByRow", leftGroupByRow)
+		// PrintPretty("_joinHeaderIndex", _joinHeaderIndex)
+		// PrintPretty("leftScanTableInfo", leftScanTableInfo)
+		// PrintPretty("leftGroupByRow", leftGroupByRow)
 		for groupKey, groupHash := range _joinHeaderIndex {
 			for key, value := range groupHash {
 				_, ok := joinHeaderIndex[groupKey]
@@ -321,7 +321,7 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, [][]st
 			}
 			joinHeaderIndex[tableName][key] = []int{value + columnIdx}
 		}
-		PrintPretty("rightScanTableInfo", rightScanTableInfo)
+		// PrintPretty("rightScanTableInfo", rightScanTableInfo)
 	}
 
 	result := make([][]string, len(leftScanTableInfo.Rows))
@@ -421,7 +421,7 @@ func (ql *CSVQL) ExecuteAST() {
 		}
 	} else {
 		joinTable, _, joinHeaderIndex, _, _ = HandleJoinTable(databasePath, joinExpr)
-		PrintPretty("joinHeaderIndex", joinHeaderIndex)
+		// PrintPretty("joinHeaderIndex", joinHeaderIndex)
 	}
 
 	if ast.GroupBy != nil {
@@ -435,7 +435,7 @@ func (ql *CSVQL) ExecuteAST() {
 		}
 		// result = append([][]string{groupByHeader}, result...)
 	} else if isJoin {
-		PrintPretty("joinTable", joinTable)
+		// PrintPretty("joinTable", joinTable)
 		for i := 1; i < len(joinTable); i++ {
 			row := joinTable[i]
 			newRow, newHeader := SelectJoinField(row, joinHeaderIndex, ast.Columns)
@@ -468,9 +468,9 @@ func (ql *CSVQL) ExecuteAST() {
 	} else {
 		result = append([][]string{headerRow}, result...)
 	}
-	PrintPretty("GroupByMap", groupByMap)
-	PrintPretty("GroupByTable", groupByTable)
-	PrintPretty("result: ", result)
+	// PrintPretty("GroupByMap", groupByMap)
+	// PrintPretty("GroupByTable", groupByTable)
+	// PrintPretty("result: ", result)
 	// fmt.Println("result:", result)
 	// return nil
 	ql.Result = result

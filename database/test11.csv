@@ -1,0 +1,6 @@
+email,department_name,location,job_title,min_salary,max_salary
+michael.williams@company.com,Sales,Chicago,HR Specialist,55000,75000
+david.jones@company.com,Finance,New York,Software Developer,55000,85000
+emily.brown@company.com,Marketing,Los Angeles,Sales Manager,65000,95000
+john.smith@company.com,Human Resources,New York,HR Director,70000,90000
+sarah.johnson@company.com,Engineering,San Francisco,Senior Software Engineer,80000,120000
