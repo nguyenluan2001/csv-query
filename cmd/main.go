@@ -1,12 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"path"
-	"strings"
+	"flag"
 
-	"github.com/nguyenluan2001/csv-query/utils"
+	"github.com/nguyenluan2001/csv-query/pkg"
 )
 
 func main() {
@@ -33,57 +30,15 @@ func main() {
 	// sql := "SELECT employees_2.email, department_name, budget FROM employees_2 JOIN department ON employees_2.department_id = department.department_id ORDER BY budget LIMIT 3"
 	// sql := "SELECT employees_2.email, job_title, min_salary, max_salary FROM employees_2 JOIN job ON employees_2.job_id = job.job_id"
 	// sql := "employees_2 LEFT JOIN department ON employees_2.department_id = department.department_id AND employees_2.first_name = 'John' "
-	sql := `SELECT employees_2.email, department_name,,location, job.job_title, job.min_salary, job.max_salary 
-			FROM employees_2 
-			JOIN job ON employees_2.job_id = job.job_id
-			JOIN department ON employees_2.department_id = department.department_id
-			`
+	// sql := `SELECT employees_2.email, department_name,,location, job.job_title, job.min_salary, job.max_salary
+	// 		FROM employees_2
+	// 		JOIN job ON employees_2.job_id = job.job_id
+	// 		JOIN department ON employees_2.department_id = department.department_id
+	// 		ORDER BY min_salary
+	// 		`
+	databasePathPtr := flag.String("d", ".", "Path to directory that stored your csv files")
+	flag.Parse()
 
-	// JOIN department ON employees_2.department_id = department.department_id
-	replacer := strings.NewReplacer("\n", " ", "\t", " ")
-	sql = replacer.Replace(sql)
-
-	fmt.Printf("sql: %v", sql)
-	// JoinExpr{
-	// 	Type: "LEFT",
-	// 	Left: JoinExpr{
-	// 		Tye:   "INNER",
-	// 		Left:  "employees",
-	// 		Right: "departments",
-	// 		Condition: OnExpr{
-	// 			Left:  "employees.department_id",
-	// 			Op:    "=",
-	// 			Right: "departments.id",
-	// 		},
-	// 	},
-	// 	Right: "job",
-	// 	Condition: OnExpr{
-	// 		Left:  "employees.job_id",
-	// 		Op:    "=",
-	// 		Right: "jobs.id",
-	// 	},
-	// }
-
-	tokens := utils.Tokenizer(sql)
-	fmt.Println("tokens", tokens)
-
-	// p := utils.NewParserFrom(tokens)
-
-	// (*p).RegisterPrefix(utils.TokenNumber, 0)
-	// (*p).RegisterPrefix(utils.TokenString, 0)
-	// (*p).RegisterPrefix(utils.TokenIdent, 0)
-	// (*p).RegisterInfix(utils.TokenOr, 100)
-	// (*p).RegisterInfix(utils.TokenAnd, 200)
-	// (*p).RegisterInfix(utils.TokenEqual, 500)
-	// left, _ := (*p).ParserFromExpression(0)
-	// fmt.Printf("left:%# v", pretty.Formatter(left))
-
-	ast, err := utils.BuildAST(tokens)
-	// fmt.Printf("ast:%# v", pretty.Formatter(ast))
-	utils.PrintPretty("AST", ast)
-	fmt.Println("err", err)
-
-	cwd, _ := os.Getwd()
-	databasePath := path.Join(cwd, "../database")
-	utils.Execute(ast, databasePath)
+	csvql := pkg.NewQuery("", *databasePathPtr)
+	csvql.Repl()
 }

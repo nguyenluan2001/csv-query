@@ -1,4 +1,4 @@
-package utils
+package pkg
 
 import (
 	"errors"
@@ -346,13 +346,16 @@ func ParseLimit(tokens []Token, pointer int) (int, int) {
 }
 
 // Build AST of whole query
-func BuildAST(tokens []Token) (AST, error) {
+func (ql *CSVQL) BuildAST() {
+	tokens := ql.Tokens
 	ast := AST{}
 	pointer := 0
 	//=== Expect SELECT ===
 	isNext, err := Expect(tokens[pointer], TokenSelect)
 	if !isNext {
-		return ast, err
+		ql.Ast = ast
+		ql.Error = err
+		return
 	}
 	pointer++
 
@@ -364,7 +367,9 @@ func BuildAST(tokens []Token) (AST, error) {
 	// === Expect FROM ===
 	isNext, err = Expect(tokens[pointer], TokenFrom)
 	if !isNext {
-		return ast, err
+		ql.Ast = ast
+		ql.Error = err
+		return
 	} else {
 		pointer++
 
@@ -413,6 +418,6 @@ func BuildAST(tokens []Token) (AST, error) {
 		pointer = endIdx + 1
 	}
 
-	return ast, nil
-
+	ql.Ast = ast
+	ql.Error = nil
 }

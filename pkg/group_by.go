@@ -1,11 +1,11 @@
-package utils
+package pkg
 
 import (
 	"slices"
 	"strings"
 )
 
-// GROUP BY utils
+// GROUP BY pkg
 func ProcessGroupByPerRow(row []string, headerRow []string, headerIndex map[string]int, tokens []Token) ([]string, []string, []string, []string, string) {
 	keyArr := []string{"groupBy"}
 	fieldIndexes := []int{}

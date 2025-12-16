@@ -1,4 +1,4 @@
-package utils
+package pkg
 
 import (
 	"encoding/csv"
@@ -351,7 +351,9 @@ func HandleJoinTable(databasePath string, joinExpr JoinExpr) ([][]string, [][]st
 	return result, notNullResult, joinHeaderIndex, joinHeader, leftGroupByRow
 }
 
-func Execute(ast AST, databasePath string) error {
+func (ql *CSVQL) ExecuteAST() {
+	ast := ql.Ast
+	databasePath := ql.DatabasePath
 	originalHeaderRow := []string{}
 	headerRow := []string{}
 	headerIndex := map[string]int{}
@@ -470,6 +472,6 @@ func Execute(ast AST, databasePath string) error {
 	PrintPretty("GroupByTable", groupByTable)
 	PrintPretty("result: ", result)
 	// fmt.Println("result:", result)
-	return nil
-
+	// return nil
+	ql.Result = result
 }

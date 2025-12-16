@@ -1,4 +1,4 @@
-package utils
+package pkg
 
 import (
 	"fmt"
@@ -407,7 +407,8 @@ func ParseOperator(startIdx int, sql string) (TokenType, string, int) {
 	}
 }
 
-func Tokenizer(sql string) []Token {
+func (ql *CSVQL) Tokenizer() {
+	sql := ql.Sql
 	tokens := []Token{}
 	pointer := 0
 	for pointer < len(sql) {
@@ -492,5 +493,5 @@ func Tokenizer(sql string) []Token {
 		Type:  TokenEOF,
 		Value: nil,
 	})
-	return tokens
+	ql.Tokens = tokens
 }
