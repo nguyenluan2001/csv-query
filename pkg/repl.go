@@ -4,13 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"time"
 
+	"github.com/cbroglie/mustache"
 	"github.com/chzyer/readline"
+	"github.com/nguyenluan2001/csv-query/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/olekukonko/tablewriter/tw"
 )
@@ -177,10 +180,7 @@ func (ql *CSVQL) Help() {
 	}
 }
 
-func (ql *CSVQL) Set(variable, value string) {
-	ql.Variables[variable] = value
-}
-
+// === VARIABLES  ===
 func (ql *CSVQL) GetVariables() {
 	rows := [][]string{}
 	count := 1
@@ -189,6 +189,11 @@ func (ql *CSVQL) GetVariables() {
 		count++
 	}
 	NewTable([]string{"#", "Name", "Value"}, rows)
+}
+
+func (ql *CSVQL) ReseVariables() {
+	ql.Variables = map[string]string{}
+	utils.EmptyFile(ql.VariableFile)
 }
 
 func SetPrompt(rl *readline.Instance, cmd string) {
@@ -309,32 +314,39 @@ func (ql *CSVQL) Repl() {
 				cmds = append(cmds, line[0:len(line)-1])
 				rl.SetPrompt("> ")
 			}
-		case strings.HasPrefix(line, "set"):
+		case strings.HasPrefix(line, "variable"):
 			{
-				expression, _ := strings.CutPrefix(line, "set")
-				expression = strings.ReplaceAll(expression, " ", "")
+				// expression, _ := strings.CutPrefix(line, "set")
+				// expression = strings.ReplaceAll(expression, " ", "")
 
-				expressionArr := strings.Split(expression, "=")
-				if len(expressionArr) != 2 {
-					fmt.Println("Set variable failed. Please try again.")
-					return
-				}
-				ql.Set(expressionArr[0], expressionArr[1])
-
+				// expressionArr := strings.Split(expression, "=")
+				// if len(expressionArr) != 2 {
+				// 	fmt.Println("Set variable failed. Please try again.")
+				// 	return
+				// }
+				// ql.Set(expressionArr[0], expressionArr[1])
+				ql.ReplVariable(line)
 			}
-		case line == "variables":
-			{
-				ql.GetVariables()
-			}
+		// case line == "variables":
+		// 	{
+		// 		ql.GetVariables()
+		// 	}
 		default:
 			{
 				cmds = append(cmds, line)
 				cmd := strings.Join(cmds, " ")
+				query, err := mustache.Render(cmd, ql.Variables)
 
-				rl.SaveHistory(cmd)
+				if err != nil {
+					log.Println("Invalid query. Please try again.")
+					return
+				}
+				PrintPretty("query", query)
+
+				rl.SaveHistory(query)
 
 				rl.SetPrompt("csvql> ")
-				ql.Sql = cmd
+				ql.Sql = query
 				start := time.Now()
 				ql.Execute()
 				duration := time.Since(start)
